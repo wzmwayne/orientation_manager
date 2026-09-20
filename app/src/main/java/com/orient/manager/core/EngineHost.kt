@@ -10,6 +10,7 @@ object EngineHost {
 
     private var running = false
     private var context: Context? = null
+    private var notificationRequested = false
 
     fun isRunning(): Boolean = running
 
@@ -52,26 +53,42 @@ object EngineHost {
     }
 
     fun syncNotification(context: Context) {
-        if (Prefs(context).serviceEnabled) {
-            startNotification(context)
-        } else {
+        if (!Prefs(context).serviceEnabled) {
+            Logger.log("Engine", "常驻通知开关=关，不启动前台服务")
             stopNotification(context, "用户关闭常驻通知")
+            return
         }
+        startNotification(context)
     }
 
     private fun startNotification(context: Context) {
+        if (notificationRequested) {
+            Logger.logThrottled("Engine", "notif", "常驻通知已请求过，跳过重复启动", 5000L)
+            return
+        }
+        notificationRequested = true
         try {
             ContextCompat.startForegroundService(
                 context,
                 Intent(context, RotationForegroundService::class.java),
             )
-            Logger.log("Engine", "已随无障碍服务启动常驻通知")
+            Logger.log(
+                "Engine",
+                "已请求启动常驻通知服务（SYSTEM_ALERT_WINDOW=" +
+                    OverlayForceController.canDrawOverlays(context) + "）",
+            )
         } catch (t: Throwable) {
-            Logger.error("Engine", "随无障碍启动常驻通知失败（可回前台手动开启）", t)
+            notificationRequested = false
+            Logger.error(
+                "Engine",
+                "启动常驻通知失败：Android 12+ 禁止后台启动前台服务；打开应用时会自动重试",
+                t,
+            )
         }
     }
 
     private fun stopNotification(context: Context, reason: String) {
+        notificationRequested = false
         try {
             context.stopService(Intent(context, RotationForegroundService::class.java))
             Logger.log("Engine", "已停止常驻通知（" + reason + "）")

@@ -23,6 +23,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.orient.manager.R
 import com.orient.manager.core.AccessibilityAutoStarter
 import com.orient.manager.core.AppRuleStore
+import com.orient.manager.core.EngineHost
 import com.orient.manager.core.KeepAlive
 import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationController
@@ -153,8 +154,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Logger.log(
+            "UI",
+            "常驻通知开关=" + Prefs(this).serviceEnabled +
+                "，系统通知可用=" + NotificationManagerCompat.from(this).areNotificationsEnabled() +
+                "，前台服务已请求=" + EngineHost.isRunning(),
+        )
         PermissionsSnapshot.log(this, "进入界面")
         AccessibilityAutoStarter.ensureStandalone(this, "进入界面")
+        EngineHost.syncNotification(this)
         refresh()
     }
 

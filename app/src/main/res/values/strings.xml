@@ -19,7 +19,7 @@
     <string name="per_app_manage">管理应用规则</string>
 
     <string name="service_title">常驻通知</string>
-    <string name="service_desc">前台常驻以免被系统冻结；强制模式会自动开启</string>
+    <string name="service_desc">前台常驻以免被系统冻结；打开应用时会自动启动</string>
 
     <string name="override_title">覆盖模式</string>
     <string name="override_desc">事件驱动重写旋转字段，与其他方向管理器争夺控制权</string>

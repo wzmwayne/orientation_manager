@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.orient.manager.R
+import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationMode
 import com.orient.manager.receiver.ActionReceiver
 import com.orient.manager.ui.MainActivity
@@ -28,6 +30,7 @@ object NotificationController {
                     NotificationManager.IMPORTANCE_LOW,
                 ),
             )
+            Logger.log("Notif", "已创建通知渠道 " + CHANNEL_ID)
         }
     }
 
@@ -49,6 +52,17 @@ object NotificationController {
         .addAction(0, context.getString(R.string.mode_portrait), modeAction(context, OrientationMode.PORTRAIT))
         .addAction(0, context.getString(R.string.mode_landscape), modeAction(context, OrientationMode.LANDSCAPE))
         .build()
+
+    fun postPlain(context: Context, mode: OrientationMode): Boolean = try {
+        ensureChannel(context)
+        NotificationManagerCompat.from(context)
+            .notify(NOTIF_ID, build(context, mode))
+        Logger.log("Notif", "已投递普通常驻通知")
+        true
+    } catch (t: Throwable) {
+        Logger.error("Notif", "投递普通通知失败", t)
+        false
+    }
 
     private fun modeAction(context: Context, mode: OrientationMode) = PendingIntent.getBroadcast(
         context,

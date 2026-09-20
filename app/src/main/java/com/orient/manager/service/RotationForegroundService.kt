@@ -18,7 +18,16 @@ class RotationForegroundService : Service() {
         Logger.log("Service", "onCreate")
         NotificationController.ensureChannel(this)
         val mode = Prefs(this).mode
-        startForeground(NotificationController.NOTIF_ID, NotificationController.build(this, mode))
+        val notification = NotificationController.build(this, mode)
+        try {
+            startForeground(NotificationController.NOTIF_ID, notification)
+            Logger.log("Service", "startForeground 成功，常驻通知已显示")
+        } catch (t: Throwable) {
+            Logger.error("Service", "startForeground 失败，退化为普通常驻通知", t)
+            NotificationController.postPlain(this, mode)
+            stopSelf()
+            return
+        }
         OrientationController.apply(this, mode)
     }
 
@@ -30,7 +39,7 @@ class RotationForegroundService : Service() {
             NotificationManagerCompat.from(this)
                 .notify(NotificationController.NOTIF_ID, NotificationController.build(this, mode))
         } catch (t: Throwable) {
-            Logger.error("Service", "更新通知失败（可能缺少通知权限）", t)
+            Logger.error("Service", "更新通知失败", t)
         }
         return START_STICKY
     }
