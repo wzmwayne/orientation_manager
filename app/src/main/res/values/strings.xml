@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">方向管理</string>
+    <string name="tile_label">方向</string>
+    <string name="fgs_subtype">维持屏幕方向</string>
+    <string name="channel_name">方向服务</string>
+    <string name="accessibility_description">用于识别当前前台应用，以便按应用设置屏幕方向</string>
+
+    <string name="mode_off">关闭（不干预）</string>
+    <string name="mode_auto">自动旋转</string>
+    <string name="mode_sensor_forced">按传感器强制旋转</string>
+    <string name="mode_portrait">竖屏</string>
+    <string name="mode_landscape">横屏</string>
+    <string name="mode_reverse_portrait">反向竖屏</string>
+    <string name="mode_reverse_landscape">反向横屏</string>
+
+    <string name="per_app_enable">按应用设置</string>
+    <string name="per_app_desc">为不同应用指定方向</string>
+    <string name="per_app_manage">管理应用规则</string>
+
+    <string name="service_title">常驻通知</string>
+    <string name="service_desc">前台常驻以免被系统冻结；强制模式会自动开启</string>
+
+    <string name="override_title">覆盖模式</string>
+    <string name="override_desc">事件驱动重写旋转字段，与其他方向管理器争夺控制权</string>
+    <string name="override_desc_on">覆盖模式 · 事件驱动 · 轮询 %1$d ms 兜底</string>
+    <string name="override_desc_hits">覆盖模式 · 已拦截外部改写 %1$d 次</string>
+
+    <string name="section_keepalive">保活</string>
+    <string name="keepalive_autostart_title">开机自启</string>
+    <string name="keepalive_autostart_desc">决定开机后能否自动恢复方向控制</string>
+    <string name="keepalive_autostart_check">点击前往「应用启动管理」</string>
+    <string name="keepalive_autostart_app_details">未发现厂商启动管理页，将打开应用详情并手动允许自启动</string>
+    <string name="keepalive_battery_title">忽略电池优化</string>
+    <string name="keepalive_battery_desc">避免后台被系统冻结或回收</string>
+    <string name="keepalive_battery_ok">已忽略，点击可再次检查</string>
+    <string name="keepalive_battery_need">未忽略，点击申请</string>
+
+    <string name="section_permissions">权限</string>
+    <string name="perm_write_title">修改系统设置</string>
+    <string name="perm_write_desc">设置通道的写入权限；已用悬浮窗或 Shizuku 时可不必授权</string>
+    <string name="perm_accessibility_title">无障碍服务</string>
+    <string name="perm_accessibility_desc">用于识别当前前台应用，驱动「按应用设置」规则</string>
+    <string name="perm_notifications_title">通知权限</string>
+    <string name="perm_notifications_desc">用于显示常驻通知，提升后台存活</string>
+    <string name="perm_overlay_title">悬浮窗权限</string>
+    <string name="perm_overlay_desc">display 级窗口方向请求，可覆盖应用自身方向</string>
+    <string name="action_grant">去授权</string>
+
+    <string name="apps_title">按应用设置</string>
+    <string name="search_hint">搜索应用</string>
+    <string name="rule_default">跟随全局</string>
+    <string name="apps_empty">没有找到可启动的应用</string>
+    <string name="apps_loading">正在加载应用…</string>
+
+    <string name="status_current">当前：%1$s</string>
+    <string name="toast_failed">操作失败</string>
+
+    <string name="main_row_strategies">旋转方案</string>
+    <string name="strategies_title">旋转方案</string>
+    <string name="strategies_section_available">可用方案</string>
+    <string name="strategies_section_unavailable">不可用（已禁用）</string>
+    <string name="strategies_hint">可单独开关；关闭后该通道不再参与方向控制</string>
+    <string name="strategies_hint_unavailable">未取得对应权限时不可启用；点击条目可前往申请</string>
+
+    <string name="strategy_settings_title">设置修改</string>
+    <string name="strategy_settings_desc">改写系统旋转偏好（accelerometer_rotation + user_rotation）</string>
+    <string name="strategy_overlay_title">悬浮窗</string>
+    <string name="strategy_overlay_desc">display 级 0×0 窗口设置 screenOrientation，可覆盖应用自身请求</string>
+    <string name="strategy_accessibility_title">无障碍</string>
+    <string name="strategy_accessibility_desc">识别前台应用，驱动「按应用设置」规则</string>
+    <string name="strategy_shizuku_title">Shizuku</string>
+    <string name="strategy_shizuku_desc">以 shell 身份执行 wm set-ignore-orientation-request，让系统忽略应用方向请求</string>
+    <string name="strategy_shell_title">Shell（root）</string>
+    <string name="strategy_shell_desc">以 root 身份执行同一条 wm 命令，让系统忽略应用方向请求</string>
+
+    <string name="strategy_state_ready">已就绪</string>
+    <string name="strategy_state_need_write">需授权「修改系统设置」</string>
+    <string name="strategy_state_need_overlay">需授权「悬浮窗」</string>
+    <string name="strategy_state_need_accessibility">需在系统设置中开启无障碍服务</string>
+    <string name="strategy_state_need_shizuku">需安装并运行 Shizuku，并授予本应用权限</string>
+    <string name="strategy_state_need_shell">需先获取 root</string>
+    <string name="strategy_state_need_android12">需要 Android 12 及以上</string>
+
+    <string name="strategy_reason_shizuku_missing">未检测到 Shizuku（未安装或服务未运行）</string>
+    <string name="strategy_reason_shizuku_not_granted">尚未取得 Shizuku 权限（点击本行申请）</string>
+    <string name="strategy_reason_shell_not_granted">尚未取得 root 权限（点击本行申请）</string>
+    <string name="strategy_reason_shell_no_root">未检测到 root</string>
+    <string name="log_title">日志</string>
+    <string name="log_copy">一键复制</string>
+    <string name="log_clear">清空</string>
+    <string name="log_copied">已复制到剪贴板</string>
+    <string name="log_empty">暂无日志</string>
+    <string name="main_row_log">日志</string>
+    <string name="section_other">其他</string>
+    <string name="perm_accessibility_desc_disconnected">已开启但未连接（可能被系统回收），点击重新开启</string>
+    <string name="status_engine_offline">⚠ 无障碍未连接，强制逻辑未运行</string>
+    <string name="strategy_state_ready_a11y_layer">已就绪（无障碍覆盖层 2032，无需悬浮窗权限）</string>
+    <string name="accessibility_autostart_ok">已通过 Shizuku/root 自动开启无障碍服务</string>
+    <string name="accessibility_autostart_failed">无法自动开启无障碍服务，请手动前往系统设置</string>
+    <string name="perm_secure_title">写入安全设置</string>
+    <string name="perm_secure_desc">一次授权即可直接开关/修复无障碍服务（免 root、免常驻 Shizuku）</string>
+    <string name="secure_granted">已授权，可直接管理无障碍服务</string>
+    <string name="secure_adb_title">手动授权命令</string>
+    <string name="secure_copy">复制命令</string>
+    <string name="secure_copied">命令已复制</string>
+    <string name="secure_failed">未获得授权</string>
+</resources>
