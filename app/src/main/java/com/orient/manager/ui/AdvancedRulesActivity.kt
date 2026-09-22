@@ -130,9 +130,13 @@ class AdvancedRulesActivity : AppCompatActivity() {
                     .inflate(R.layout.advanced_rule_row, parent, false)
             val rule = rules[position]
             view.findViewById<TextView>(R.id.index).text = "#" + (position + 1)
-            view.findViewById<TextView>(R.id.title).text = rule.summary()
-            view.findViewById<TextView>(R.id.subtitle).text =
+            val named = rule.name.isNotBlank()
+            view.findViewById<TextView>(R.id.title).text = rule.title()
+            view.findViewById<TextView>(R.id.subtitle).text = if (named) {
+                rule.summary() + "  → " + getString(rule.mode.labelRes)
+            } else {
                 rule.conditions.size.toString() + " 个条件（全部满足） → " + getString(rule.mode.labelRes)
+            }
             view.findViewById<View>(R.id.body).setOnClickListener {
                 startActivity(
                     Intent(this@AdvancedRulesActivity, RuleEditActivity::class.java)

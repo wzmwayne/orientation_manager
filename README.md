@@ -99,21 +99,27 @@ adb shell pm grant com.orient.manager android.permission.WRITE_SECURE_SETTINGS
 ./gradlew :app:assembleDebug
 ~~~
 
-## 导出设置
+## 导入 / 导出设置
 
-主界面「其他 → 导出全部设置（JSON）」会生成一份包含以下内容的 JSON（用系统文件选择器保存到任意位置）：
+主界面「其他 → **导出全部设置（JSON）**」生成一份 JSON（系统文件选择器，任意位置，无需存储权限）：
 
-\`\`\`
+```
 { "app": …, "versionName": …, "exportedAt": …,
   "global":       { mode / 常驻通知 / 覆盖模式 / 检测悬浮窗 / 各通道开关 },
   "perApp":       { enabled, rules: { 包名: 模式 } },
-  "advancedRules":{ enabled, rules: [ { mode, conditions: [ { field, pattern, negate } ] } ] } }
-\`\`\`
+  "advancedRules":{ enabled, rules: [ { name, mode, conditions: [ { field, pattern, negate } ] } ] } }
+```
+
+「其他 → **导入设置（JSON）**」选择该文件：先弹出预览（来源版本、全局模式、按应用与高级规则条数），确认后**覆盖**当前的全局开关、按应用配置与高级规则，并重新应用引擎与常驻通知。
+
+## 高级规则命名
+
+新建/编辑规则时顶部可填「规则名称」：填了就显示名称，留空则回退显示条件摘要（如「ANY 匹配 xxx」）。列表里已命名的规则会在副标题额外显示条件内容。
 
 ## 使用
 
 1. 安装 APK
-2. 授权：修改系统设置 → 悬浮窗（可选）→ 通知
+2. 授权：修改系统设置 → 通知（可选）；覆盖层不需要悬浮窗权限
 3. 系统设置里开启本应用的**无障碍服务**（引擎宿主）
 4. 选择方向（或在「按应用设置」里为单个应用指定）
 5. 需要压制其他方向管理器时：开启「覆盖模式」，或接入 Shizuku / root 通道

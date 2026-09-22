@@ -34,6 +34,7 @@ class RuleEditActivity : AppCompatActivity() {
     private lateinit var store: AdvancedRuleStore
     private lateinit var adapter: ConditionsAdapter
     private lateinit var toolbar: MaterialToolbar
+    private lateinit var nameInput: EditText
     private lateinit var patternInput: EditText
     private lateinit var fieldSpinner: Spinner
     private lateinit var modeSpinner: Spinner
@@ -57,6 +58,7 @@ class RuleEditActivity : AppCompatActivity() {
 
         store = AdvancedRuleStore(this)
         index = intent.getIntExtra(EXTRA_INDEX, NEW_RULE)
+        nameInput = findViewById(R.id.rule_name)
         patternInput = findViewById(R.id.rule_pattern)
         fieldSpinner = findViewById(R.id.rule_field)
         modeSpinner = findViewById(R.id.rule_mode)
@@ -86,6 +88,7 @@ class RuleEditActivity : AppCompatActivity() {
 
         val existing = store.all().getOrNull(index)
         if (existing != null) {
+            nameInput.setText(existing.name)
             conditions.addAll(existing.conditions)
             modeSpinner.setSelection(modes.indexOf(existing.mode).coerceAtLeast(0))
             toolbar.title = getString(R.string.rule_edit_title) + " #" + (index + 1)
@@ -237,13 +240,15 @@ class RuleEditActivity : AppCompatActivity() {
             return
         }
         val mode = modes[modeSpinner.selectedItemPosition.coerceIn(modes.indices)]
-        val rule = AdvancedRule(conditions.toList(), mode)
+        val name = nameInput.text.toString().trim()
+        val rule = AdvancedRule(conditions.toList(), mode, name)
+        val label = if (name.isBlank()) "（未命名）" + rule.summary() else name
         if (index == NEW_RULE) {
             store.add(rule)
-            Logger.log("UI", "新建高级规则：" + rule.summary() + " → " + mode.name)
+            Logger.log("UI", "新建高级规则：" + label + " → " + mode.name)
         } else {
             store.update(index, rule)
-            Logger.log("UI", "更新高级规则 #" + (index + 1) + "：" + rule.summary() + " → " + mode.name)
+            Logger.log("UI", "更新高级规则 #" + (index + 1) + "：" + label + " → " + mode.name)
         }
         OrientationAccessibilityService.instance?.requestActiveDetection("规则保存")
         Toast.makeText(this, getString(R.string.rule_edit_saved), Toast.LENGTH_SHORT).show()

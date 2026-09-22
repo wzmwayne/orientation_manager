@@ -91,6 +91,14 @@
     <string name="log_empty">暂无日志</string>
     <string name="main_row_log">日志</string>
     <string name="main_row_export">导出全部设置（JSON）</string>
+    <string name="main_row_import">导入设置（JSON）</string>
+    <string name="import_title">导入设置</string>
+    <string name="import_apply">导入</string>
+    <string name="import_reading">正在读取…</string>
+    <string name="import_confirm">将覆盖当前的全局开关、按应用配置与高级规则：\n\n%1$s\n\n确定导入？</string>
+    <string name="import_done">导入完成：按应用 %1$d 条 · 高级 %2$d 条</string>
+    <string name="import_failed">导入失败：请选择本应用导出的设置 JSON</string>
+    <string name="rule_name_hint">规则名称（留空则显示条件）</string>
     <string name="export_running">正在导出…</string>
     <string name="export_done">已导出全部设置（含按应用配置与高级规则）</string>
     <string name="export_failed">导出失败，请重试</string>

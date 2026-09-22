@@ -20,6 +20,10 @@ class AppRuleStore(context: Context) {
 
     fun snapshot(): JSONObject = rules()
 
+    fun replaceAll(rules: JSONObject) {
+        sp.edit().putString(KEY_RULES, rules.toString()).apply()
+    }
+
     fun set(pkg: String, mode: OrientationMode?) {
         val obj = rules()
         if (mode == null) obj.remove(pkg) else obj.put(pkg, mode.name)

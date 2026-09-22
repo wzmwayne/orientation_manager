@@ -12,6 +12,19 @@
         app:navigationIcon="?attr/homeAsUpIndicator"
         app:title="@string/rule_edit_title" />
 
+    <EditText
+        android:id="@+id/rule_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/rule_name_hint"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:maxLines="1"
+        android:paddingStart="20dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="20dp"
+        android:textSize="14sp" />
+
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

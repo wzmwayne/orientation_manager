@@ -123,32 +123,10 @@ class AdvancedRuleStore(context: Context) {
             Logger.error("AdvRule", "解析高级规则失败", t)
             JSONArray()
         }
-        val result = ArrayList<AdvancedRule>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            val mode = OrientationMode.entries.firstOrNull { it.name == obj.optString("mode") }
-                ?: continue
-            val conditions = ArrayList<RuleCondition>()
-            val condArray = obj.optJSONArray("conditions")
-            if (condArray != null) {
-                for (j in 0 until condArray.length()) {
-                    val c = condArray.optJSONObject(j) ?: continue
-                    val pattern = c.optString("pattern")
-                    if (pattern.isBlank()) continue
-                    val field = runCatching { RuleField.valueOf(c.optString("field")) }
-                        .getOrDefault(RuleField.ANY)
-                    conditions.add(RuleCondition(field, pattern, c.optBoolean("negate", false)))
-                }
-            } else if (obj.optString("pattern").isNotBlank()) {
-                val field = runCatching { RuleField.valueOf(obj.optString("field")) }
-                    .getOrDefault(RuleField.ANY)
-                conditions.add(RuleCondition(field, obj.optString("pattern")))
-            }
-            if (conditions.isEmpty()) continue
-            result.add(AdvancedRule(conditions, mode))
-        }
-        return result
+        return parseRules(array)
     }
+
+    fun replaceAll(list: List<AdvancedRule>) = save(list)
 
     private fun compile(pattern: String): Regex? = try {
         Regex(pattern, RegexOption.IGNORE_CASE)
@@ -183,6 +161,7 @@ class AdvancedRuleStore(context: Context) {
             }
             obj.put("conditions", condArray)
             obj.put("mode", rule.mode.name)
+            obj.put("name", rule.name)
             array.put(obj)
         }
         return array
@@ -212,9 +191,37 @@ class AdvancedRuleStore(context: Context) {
         Logger.log("AdvRule", "已从旧的页面规则迁移 " + legacyRules.size + " 条（全部字段 + 正则转义）")
     }
 
-    private companion object {
-        const val KEY_ENABLED = "advanced_rules_enabled"
-        const val KEY_RULES = "advanced_rules"
+    companion object {
+        private const val KEY_ENABLED = "advanced_rules_enabled"
+        private const val KEY_RULES = "advanced_rules"
+
+        fun parseRules(array: JSONArray): List<AdvancedRule> {
+            val result = ArrayList<AdvancedRule>()
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                val mode = OrientationMode.entries.firstOrNull { it.name == obj.optString("mode") }
+                    ?: continue
+                val conditions = ArrayList<RuleCondition>()
+                val condArray = obj.optJSONArray("conditions")
+                if (condArray != null) {
+                    for (j in 0 until condArray.length()) {
+                        val c = condArray.optJSONObject(j) ?: continue
+                        val pattern = c.optString("pattern")
+                        if (pattern.isBlank()) continue
+                        val field = runCatching { RuleField.valueOf(c.optString("field")) }
+                            .getOrDefault(RuleField.ANY)
+                        conditions.add(RuleCondition(field, pattern, c.optBoolean("negate", false)))
+                    }
+                } else if (obj.optString("pattern").isNotBlank()) {
+                    val field = runCatching { RuleField.valueOf(obj.optString("field")) }
+                        .getOrDefault(RuleField.ANY)
+                    conditions.add(RuleCondition(field, obj.optString("pattern")))
+                }
+                if (conditions.isEmpty()) continue
+                result.add(AdvancedRule(conditions, mode, obj.optString("name")))
+            }
+            return result
+        }
 
         private val lock = Any()
         private var cache: List<AdvancedRule>? = null

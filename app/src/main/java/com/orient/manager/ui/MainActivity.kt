@@ -32,7 +32,9 @@ import com.orient.manager.core.PermissionsSnapshot
 import com.orient.manager.core.OrientationMode
 import com.orient.manager.core.OverlayForceController
 import com.orient.manager.core.RotationEnforcer
+import com.orient.manager.core.ActivityInspector
 import com.orient.manager.core.SettingsExporter
+import com.orient.manager.core.SettingsImporter
 import com.orient.manager.core.SystemFields
 import com.orient.manager.core.strategy.StrategyManager
 import com.orient.manager.pref.Prefs
@@ -63,6 +65,10 @@ class MainActivity : AppCompatActivity() {
     private val exportLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
     ) { uri -> uri?.let { writeExport(it) } }
+
+    private val importLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { readImport(it) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -139,6 +145,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.row_export).setOnClickListener { startExport() }
+
+        findViewById<View>(R.id.row_import).setOnClickListener { startImport() }
 
         rowWrite.setOnClickListener {
             startActivity(
@@ -321,6 +329,80 @@ class MainActivity : AppCompatActivity() {
                     .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
             )
         }
+    }
+
+    private fun startImport() {
+        try {
+            importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        } catch (t: Throwable) {
+            Logger.error("Import", "无法打开文件选择器", t)
+            Toast.makeText(this, getString(R.string.import_failed), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun readImport(uri: Uri) {
+        Toast.makeText(this, getString(R.string.import_reading), Toast.LENGTH_SHORT).show()
+        Logger.log("Import", "开始读取设置文件 -> " + uri)
+        Thread {
+            val raw = try {
+                contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                    ?: throw IllegalStateException("openInputStream 返回 null")
+            } catch (t: Throwable) {
+                null
+            }
+            var preview: SettingsImporter.Preview? = null
+            var failure: Throwable? = null
+            if (raw.isNullOrBlank()) {
+                failure = IllegalStateException("设置文件为空或无法读取")
+            } else {
+                try {
+                    preview = SettingsImporter.preview(this, raw)
+                } catch (t: Throwable) {
+                    failure = t
+                }
+            }
+            val json = raw
+            val summary = preview
+            val error = failure
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (error != null || summary == null || json == null) {
+                    Logger.error("Import", "解析设置文件失败", error ?: IllegalStateException("未知错误"))
+                    Toast.makeText(this, getString(R.string.import_failed), Toast.LENGTH_LONG).show()
+                } else {
+                    confirmImport(json, summary)
+                }
+            }
+        }.start()
+    }
+
+    private fun confirmImport(json: String, preview: SettingsImporter.Preview) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.import_title)
+            .setMessage(getString(R.string.import_confirm, preview.describe))
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.import_apply) { _, _ -> applyImport(json) }
+            .show()
+    }
+
+    private fun applyImport(json: String) {
+        val summary = try {
+            SettingsImporter.apply(this, json)
+        } catch (t: Throwable) {
+            Logger.error("Import", "导入设置失败", t)
+            Toast.makeText(this, getString(R.string.import_failed), Toast.LENGTH_LONG).show()
+            return
+        }
+        Logger.log("Import", "导入完成：" + summary.describe.replace('\n', ' '))
+        ActivityInspector.setEnabled(this, Prefs(this).inspectorEnabled)
+        OrientationController.apply(this, Prefs(this).mode, "导入设置")
+        EngineHost.syncNotification(this)
+        refresh()
+        Toast.makeText(
+            this,
+            getString(R.string.import_done, summary.perAppCount, summary.advancedCount),
+            Toast.LENGTH_LONG,
+        ).show()
     }
 
     private fun startExport() {

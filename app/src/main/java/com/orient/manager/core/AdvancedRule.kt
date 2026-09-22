@@ -63,6 +63,9 @@ data class RuleCondition(
 data class AdvancedRule(
     val conditions: List<RuleCondition>,
     val mode: OrientationMode,
+    val name: String = "",
 ) {
     fun summary(): String = conditions.joinToString(" 且 ") { it.describe() }
+
+    fun title(): String = name.trim().ifBlank { summary() }
 }

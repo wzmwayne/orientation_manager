@@ -12,7 +12,7 @@ object RuleEngine {
     fun resolve(context: Context, snapshot: WindowSnapshot): Resolution {
         val ruleMatch = AdvancedRuleStore(context).match(snapshot, context.packageName)
         if (ruleMatch != null) {
-            val source = "高级规则#" + (ruleMatch.index + 1) + " " + ruleMatch.rule.summary()
+            val source = "高级规则#" + (ruleMatch.index + 1) + " " + ruleMatch.rule.title()
             Logger.log(
                 "Rule",
                 "解析：包=" + snapshot.pkg + " 活动=" + snapshot.activityClass +
