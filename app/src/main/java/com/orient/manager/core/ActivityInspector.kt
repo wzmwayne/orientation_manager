@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -236,22 +237,33 @@ object ActivityInspector {
         val row = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(context, 4), 0, 0)
+            minimumHeight = dp(context, 36)
+            setPadding(0, dp(context, 2), 0, dp(context, 2))
+            val outValue = TypedValue()
+            if (context.theme.resolveAttribute(
+                    android.R.attr.selectableItemBackground,
+                    outValue,
+                    true,
+                )
+            ) {
+                setBackgroundResource(outValue.resourceId)
+            }
+            if (collapsible) {
+                setOnClickListener { toggle(key) }
+            }
         }
         val header = TextView(context).apply {
             text = "▾ " + title
             setTextColor(0xFFFFFFFF.toInt())
-            textSize = 10f
-            if (collapsible) {
-                setOnClickListener { toggle(key) }
-            }
+            textSize = 11f
+            setPadding(dp(context, 2), dp(context, 8), 0, dp(context, 8))
         }
         headerViews[key] = header
         val copy = TextView(context).apply {
             text = "[复制]"
             setTextColor(0xFF80CBC4.toInt())
-            textSize = 10f
-            setPadding(dp(context, 8), 0, 0, 0)
+            textSize = 11f
+            setPadding(dp(context, 12), dp(context, 8), dp(context, 6), dp(context, 8))
             setOnClickListener { copyText(context, target.text.toString(), title) }
         }
         row.addView(header, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
