@@ -1,11 +1,12 @@
 package com.orient.manager.core
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.os.Build
 import android.text.TextUtils
 import android.view.Gravity
@@ -14,7 +15,9 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 
 object NodeInspectorOverlay {
 
@@ -62,13 +65,26 @@ object NodeInspectorOverlay {
         }
         val layout = FrameLayout(ctx)
         val panel = TextView(ctx).apply {
-            setBackgroundColor(0xE6000000.toInt())
             setTextColor(0xFF8FE3FF.toInt())
             textSize = 10f
-            setPadding(16, 12, 16, 12)
-            visibility = if (pickMode) View.VISIBLE else View.GONE
+            setPadding(16, 12, 16, 4)
             text = "点击任意组件查看详细信息"
+            setTextIsSelectable(true)
         }
+        val copyButton = Button(ctx).apply {
+            text = "复制"
+            textSize = 11f
+            setOnClickListener { copyDetails(ctx, panel.text.toString()) }
+        }
+        val panelBox = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xE6000000.toInt())
+            setPadding(8, 8, 8, 8)
+            addView(panel)
+            addView(copyButton)
+            visibility = if (pickMode) View.VISIBLE else View.GONE
+        }
+
         val canvas = NodeCanvasView(ctx, nodes, pickMode) { node ->
             panel.text = node.detail()
         }
@@ -80,7 +96,7 @@ object NodeInspectorOverlay {
             ),
         )
         layout.addView(
-            panel,
+            panelBox,
             FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -126,6 +142,21 @@ object NodeInspectorOverlay {
         }
     }
 
+    private fun copyDetails(context: Context, detail: String) {
+        if (detail.isBlank()) {
+            Toast.makeText(context, "暂无组件详情", Toast.LENGTH_SHORT).show()
+            return
+        }
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            clipboard?.setPrimaryClip(ClipData.newPlainText("组件详情", detail))
+            Toast.makeText(context, "组件详情已复制", Toast.LENGTH_SHORT).show()
+            Logger.log("NodeOverlay", "已复制组件详情：" + detail.replace('\n', ' '))
+        } catch (t: Throwable) {
+            Logger.error("NodeOverlay", "复制组件详情失败", t)
+        }
+    }
+
     private class NodeCanvasView(
         context: Context,
         private val nodes: List<NodeInfo>,
@@ -160,12 +191,13 @@ object NodeInspectorOverlay {
                 canvas.drawRect(rect, boxPaint)
                 val label = node.label()
                 if (label.isNotBlank() && rect.height() > 24) {
-                    canvas.drawText(
-                        TextUtils.ellipsize(label, android.text.TextPaint(textPaint), rect.width().toFloat() - 4, TextUtils.TruncateAt.END).toString(),
-                        rect.left.toFloat() + 2,
-                        rect.top.toFloat() + 20,
-                        textPaint,
-                    )
+                    val clipped = TextUtils.ellipsize(
+                        label,
+                        android.text.TextPaint(textPaint),
+                        (rect.width() - 4).toFloat(),
+                        TextUtils.TruncateAt.END,
+                    ).toString()
+                    canvas.drawText(clipped, rect.left.toFloat() + 2, rect.top.toFloat() + 20, textPaint)
                 }
             }
             highlight?.let { node ->

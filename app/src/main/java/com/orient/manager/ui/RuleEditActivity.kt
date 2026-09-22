@@ -1,6 +1,9 @@
 package com.orient.manager.ui
 
+import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
@@ -38,7 +41,15 @@ class RuleEditActivity : AppCompatActivity() {
     private val fields = RuleField.entries
     private val modes = OrientationMode.entries
     private val conditions = mutableListOf<RuleCondition>()
+    private val handler = Handler(Looper.getMainLooper())
+    private var pendingDeletePosition = -1
+    private var pendingDeleteAt = 0L
     private var index = NEW_RULE
+
+    private val resetPending = Runnable {
+        pendingDeletePosition = -1
+        adapter.notifyDataSetChanged()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -92,6 +103,11 @@ class RuleEditActivity : AppCompatActivity() {
         render()
     }
 
+    override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
+    }
+
     private fun addCondition() {
         val pattern = patternInput.text.toString().trim()
         if (pattern.isEmpty()) {
@@ -106,16 +122,43 @@ class RuleEditActivity : AppCompatActivity() {
         conditions.add(RuleCondition(field, pattern))
         Logger.log("UI", "规则添加条件：字段=" + field.name + " 正则=" + pattern)
         patternInput.setText("")
+        clearPending()
         render()
+    }
+
+    private fun onConditionTap(position: Int) {
+        val now = System.currentTimeMillis()
+        if (pendingDeletePosition == position && now - pendingDeleteAt <= CONFIRM_WINDOW_MS) {
+            conditions.removeAt(position)
+            Logger.log("UI", "二次点击确认，删除条件 #" + (position + 1))
+            clearPending()
+            render()
+            return
+        }
+        pendingDeletePosition = position
+        pendingDeleteAt = now
+        handler.removeCallbacks(resetPending)
+        handler.postDelayed(resetPending, CONFIRM_WINDOW_MS)
+        Toast.makeText(this, getString(R.string.condition_delete_hint), Toast.LENGTH_SHORT).show()
+        Logger.log("UI", "条件 #" + (position + 1) + " 进入待删除状态（2 秒内再次点击删除）")
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun clearPending() {
+        pendingDeletePosition = -1
+        handler.removeCallbacks(resetPending)
     }
 
     private fun editCondition(position: Int) {
         val condition = conditions.getOrNull(position) ?: return
+        if (pendingDeletePosition == position) {
+            clearPending()
+            adapter.notifyDataSetChanged()
+        }
         val labels = arrayOf(
             getString(R.string.cond_menu_behavior),
             getString(R.string.cond_menu_pattern),
             getString(R.string.cond_menu_field),
-            getString(R.string.cond_menu_delete),
         )
         MaterialAlertDialogBuilder(this)
             .setTitle(condition.describe())
@@ -123,12 +166,7 @@ class RuleEditActivity : AppCompatActivity() {
                 when (which) {
                     0 -> editBehavior(position, condition)
                     1 -> editPattern(position, condition)
-                    2 -> editField(position, condition)
-                    else -> {
-                        conditions.removeAt(position)
-                        Logger.log("UI", "移除条件 #" + (position + 1))
-                        render()
-                    }
+                    else -> editField(position, condition)
                 }
             }
             .show()
@@ -238,11 +276,31 @@ class RuleEditActivity : AppCompatActivity() {
             val view = convertView
                 ?: LayoutInflater.from(this@RuleEditActivity)
                     .inflate(R.layout.condition_row, parent, false)
+            if (view.tag == null) view.tag = view.background
             val condition = conditions[position]
             view.findViewById<TextView>(R.id.condition_field).text =
                 getString(condition.field.labelRes) + (if (condition.negate) "（不匹配）" else "")
             view.findViewById<TextView>(R.id.condition_pattern).text = condition.pattern
-            view.setOnClickListener { editCondition(position) }
+
+            val pending = position == pendingDeletePosition
+            if (pending) {
+                view.setBackgroundColor(PENDING_COLOR)
+                view.findViewById<TextView>(R.id.condition_pattern).setTextColor(0xFFFF5252.toInt())
+            } else {
+                (view.tag as? Drawable)?.let { view.background = it }
+                view.findViewById<TextView>(R.id.condition_pattern).setTextColor(
+                    androidx.core.content.ContextCompat.getColor(
+                        this@RuleEditActivity,
+                        android.R.color.primary_text_dark,
+                    ),
+                )
+            }
+
+            view.setOnClickListener { onConditionTap(position) }
+            view.setOnLongClickListener {
+                editCondition(position)
+                true
+            }
             return view
         }
     }
@@ -250,5 +308,7 @@ class RuleEditActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_INDEX = "rule_index"
         private const val NEW_RULE = -1
+        private const val CONFIRM_WINDOW_MS = 2000L
+        private const val PENDING_COLOR = 0x33FF0000
     }
 }

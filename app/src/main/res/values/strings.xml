@@ -145,7 +145,7 @@
     <string name="rule_field_screen_id">组件 ID</string>
     <string name="rule_field_node_class">组件类名</string>
     <string name="rule_edit_title">编辑规则</string>
-    <string name="rule_edit_conditions">条件：全部满足才激活（正则，忽略大小写）</string>
+    <string name="rule_edit_conditions">条件：全部满足才激活；单击两下删除，长按编辑；正则忽略大小写</string>
     <string name="rule_edit_add_condition">添加条件</string>
     <string name="rule_edit_save">保存</string>
     <string name="rule_edit_delete">删除规则</string>
@@ -162,4 +162,5 @@
     <string name="cond_edit_field">更改匹配字段</string>
     <string name="advanced_new_rule">新建规则</string>
     <string name="action_delete">删除</string>
+    <string name="condition_delete_hint">再次点击删除该条件（2 秒内）</string>
 </resources>
