@@ -14,7 +14,7 @@ object PermissionsSnapshot {
         val a11yConnected = OrientationAccessibilityService.connected
         Logger.log("Perm", "===== 权限体检（" + reason + "）=====")
         Logger.log("Perm", "修改系统设置 = " + OrientationController.canWrite(context))
-        Logger.log("Perm", "悬浮窗 = " + OverlayForceController.canForce(context))
+        Logger.log("Perm", "无障碍覆盖层可用 = " + OverlayForceController.canForce(context))
         Logger.log("Perm", "无障碍 已开启 = " + a11yEnabled + "，已连接 = " + a11yConnected)
         Logger.log(
             "Perm",

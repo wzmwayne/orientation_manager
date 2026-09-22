@@ -20,6 +20,7 @@ import com.orient.manager.pref.Prefs
 
 object ActivityInspector {
 
+    private const val TYPE_ACCESSIBILITY_OVERLAY = 2032
     private const val MAX_HISTORY = 4
     private const val MAX_WINDOW_LINES = 6
 
@@ -53,11 +54,11 @@ object ActivityInspector {
 
     fun show(context: Context) {
         if (view != null) return
-        if (!OverlayForceController.canDrawOverlays(context)) {
-            Logger.warn("Inspector", "缺少悬浮窗权限，无法显示检测窗")
+        val ctx = EngineHost.engineContext()
+        if (ctx == null) {
+            Logger.warn("Inspector", "无障碍宿主未连接，无法显示检测窗（只用 2032，不要求悬浮窗权限）")
             return
         }
-        val ctx = EngineHost.engineContext() ?: context.applicationContext
         val manager = ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         if (manager == null) {
             Logger.error("Inspector", "无法获取 WindowManager")
@@ -66,9 +67,10 @@ object ActivityInspector {
         val p = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -84,7 +86,10 @@ object ActivityInspector {
             params = p
             selectMode = false
             render()
-            Logger.log("Inspector", "检测悬浮窗已显示（拖动标题移动；内置复制按钮；可切换选择模式）")
+            Logger.log(
+                "Inspector",
+                "检测悬浮窗已显示：type=2032 无障碍层 + SHOW_WHEN_LOCKED（设置/锁屏等界面均可见；无需悬浮窗权限）",
+            )
         } catch (t: Throwable) {
             Logger.error("Inspector", "添加检测悬浮窗失败", t)
         }

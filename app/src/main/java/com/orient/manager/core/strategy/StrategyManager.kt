@@ -55,15 +55,14 @@ object StrategyManager {
 
         StrategyId.OVERLAY -> {
             val a11y = OrientationAccessibilityService.connected
-            val canDraw = OverlayForceController.canDrawOverlays(context)
             StrategyState(
                 id,
                 true,
                 null,
-                when {
-                    a11y -> context.getString(R.string.strategy_state_ready_a11y_layer)
-                    canDraw -> context.getString(R.string.strategy_state_ready)
-                    else -> context.getString(R.string.strategy_state_need_overlay)
+                if (a11y) {
+                    context.getString(R.string.strategy_state_ready_a11y_layer)
+                } else {
+                    context.getString(R.string.strategy_state_need_overlay)
                 },
                 isEnabled(context, id),
             )

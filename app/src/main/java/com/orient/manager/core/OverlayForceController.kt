@@ -3,15 +3,12 @@ package com.orient.manager.core
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.graphics.PixelFormat
-import android.os.Build
-import android.provider.Settings
 import android.view.View
 import android.view.WindowManager
 
 object OverlayForceController {
 
     private const val TYPE_ACCESSIBILITY_OVERLAY = 2032
-    private const val TYPE_APPLICATION_OVERLAY = 2038
 
     private const val FLAGS_ORIGINAL =
         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -21,48 +18,35 @@ object OverlayForceController {
     private var view: View? = null
     private var windowManager: WindowManager? = null
     private var params: WindowManager.LayoutParams? = null
-    private var usingAccessibilityLayer = false
 
-    fun canDrawOverlays(context: Context): Boolean = try {
-        Settings.canDrawOverlays(context)
-    } catch (t: Throwable) {
-        Logger.error("Overlay", "canDrawOverlays 探测异常", t)
-        false
-    }
-
-    fun canForce(context: Context): Boolean =
-        EngineHost.engineContext() != null || canDrawOverlays(context)
+    fun canForce(context: Context): Boolean = EngineHost.engineContext() != null
 
     fun describe(): String {
         val p = params
         return "attached=" + (view?.isAttachedToWindow ?: false) +
-            " type=" + (if (usingAccessibilityLayer) TYPE_ACCESSIBILITY_OVERLAY else TYPE_APPLICATION_OVERLAY) +
+            " type=" + TYPE_ACCESSIBILITY_OVERLAY +
             " screenOrientation=" + (p?.screenOrientation ?: -99)
     }
 
     fun apply(context: Context, screenOrientation: Int) {
-        val serviceContext = EngineHost.engineContext()
-        if (serviceContext == null && !canDrawOverlays(context)) {
-            Logger.warn("Overlay", "跳过：无无障碍宿主且无悬浮窗权限")
+        val ctx = EngineHost.engineContext()
+        if (ctx == null) {
+            Logger.warn("Overlay", "跳过：无障碍宿主未连接（覆盖层只用 2032，不再要求悬浮窗权限）")
             return
         }
-        val ctx = serviceContext ?: context.applicationContext
-        val wantAccessibilityLayer = serviceContext != null
-
-        if (windowManager == null || usingAccessibilityLayer != wantAccessibilityLayer) {
+        if (windowManager == null) {
             windowManager = ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
             params = WindowManager.LayoutParams(
                 1,
                 1,
-                if (wantAccessibilityLayer) TYPE_ACCESSIBILITY_OVERLAY else TYPE_APPLICATION_OVERLAY,
+                TYPE_ACCESSIBILITY_OVERLAY,
                 FLAGS_ORIGINAL,
                 PixelFormat.TRANSPARENT,
             )
-            usingAccessibilityLayer = wantAccessibilityLayer
             view = null
             Logger.log(
                 "Overlay",
-                "初始化窗口组件 type=" + (if (wantAccessibilityLayer) TYPE_ACCESSIBILITY_OVERLAY else TYPE_APPLICATION_OVERLAY) +
+                "初始化窗口组件 type=" + TYPE_ACCESSIBILITY_OVERLAY +
                     " flags=" + FLAGS_ORIGINAL + " size=1x1",
             )
         }
@@ -92,13 +76,9 @@ object OverlayForceController {
             }
         } catch (t: Throwable) {
             Logger.error("Overlay", "添加/更新窗口失败 screenOrientation=" + screenOrientation, t)
-            if (usingAccessibilityLayer) {
-                Logger.warn("Overlay", "2032 失败，下一轮回退到 2038 + 悬浮窗权限")
-                windowManager = null
-                params = null
-                view = null
-                usingAccessibilityLayer = false
-            }
+            windowManager = null
+            params = null
+            view = null
         }
     }
 
@@ -106,7 +86,7 @@ object OverlayForceController {
         val existing = view ?: return
         val manager = windowManager ?: return
         val p = params ?: return
-        if (usingAccessibilityLayer && EngineHost.engineContext() == null) {
+        if (EngineHost.engineContext() == null) {
             Logger.warn("Overlay", "无障碍宿主已丢失，移除覆盖层")
             stop()
             return

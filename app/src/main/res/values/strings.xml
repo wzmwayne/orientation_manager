@@ -38,13 +38,11 @@
 
     <string name="section_permissions">权限</string>
     <string name="perm_write_title">修改系统设置</string>
-    <string name="perm_write_desc">设置通道的写入权限；已用悬浮窗或 Shizuku 时可不必授权</string>
+    <string name="perm_write_desc">设置通道的写入权限；已用无障碍覆盖层或 Shizuku 时可不必授权</string>
     <string name="perm_accessibility_title">无障碍服务</string>
     <string name="perm_accessibility_desc">用于识别当前前台应用，驱动「按应用设置」规则</string>
     <string name="perm_notifications_title">通知权限</string>
     <string name="perm_notifications_desc">用于显示常驻通知，提升后台存活</string>
-    <string name="perm_overlay_title">悬浮窗权限</string>
-    <string name="perm_overlay_desc">display 级窗口方向请求，可覆盖应用自身方向</string>
     <string name="action_grant">去授权</string>
 
     <string name="apps_title">按应用设置</string>
@@ -65,8 +63,8 @@
 
     <string name="strategy_settings_title">设置修改</string>
     <string name="strategy_settings_desc">改写系统旋转偏好（accelerometer_rotation + user_rotation）</string>
-    <string name="strategy_overlay_title">悬浮窗</string>
-    <string name="strategy_overlay_desc">display 级 0×0 窗口设置 screenOrientation，可覆盖应用自身请求</string>
+    <string name="strategy_overlay_title">无障碍覆盖层</string>
+    <string name="strategy_overlay_desc">display 级 1x1 TYPE_ACCESSIBILITY_OVERLAY(2032) 窗口设置 screenOrientation，可覆盖应用自身方向请求</string>
     <string name="strategy_accessibility_title">无障碍</string>
     <string name="strategy_accessibility_desc">识别前台应用，驱动「按应用设置」规则</string>
     <string name="strategy_shizuku_title">Shizuku</string>
@@ -76,7 +74,7 @@
 
     <string name="strategy_state_ready">已就绪</string>
     <string name="strategy_state_need_write">需授权「修改系统设置」</string>
-    <string name="strategy_state_need_overlay">需授权「悬浮窗」</string>
+    <string name="strategy_state_need_overlay">需开启「无障碍服务」（覆盖层只用 2032）</string>
     <string name="strategy_state_need_accessibility">需在系统设置中开启无障碍服务</string>
     <string name="strategy_state_need_shizuku">需安装并运行 Shizuku，并授予本应用权限</string>
     <string name="strategy_state_need_shell">需先获取 root</string>

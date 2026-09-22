@@ -21,6 +21,8 @@ import android.widget.Toast
 
 object NodeInspectorOverlay {
 
+    private const val TYPE_ACCESSIBILITY_OVERLAY = 2032
+
     private var root: View? = null
     private var windowManager: WindowManager? = null
     private var params: WindowManager.LayoutParams? = null
@@ -53,11 +55,11 @@ object NodeInspectorOverlay {
 
     private fun show(context: Context, nodes: List<NodeInfo>, pickMode: Boolean) {
         hide()
-        if (!OverlayForceController.canDrawOverlays(context)) {
-            Logger.warn("NodeOverlay", "缺少悬浮窗权限，无法显示组件检查层")
+        val ctx = EngineHost.engineContext()
+        if (ctx == null) {
+            Logger.warn("NodeOverlay", "无障碍宿主未连接，无法显示组件检查层（只用 2032，不要求悬浮窗权限）")
             return
         }
-        val ctx = EngineHost.engineContext() ?: context.applicationContext
         val manager = ctx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         if (manager == null) {
             Logger.error("NodeOverlay", "无法获取 WindowManager")
@@ -119,12 +121,13 @@ object NodeInspectorOverlay {
             )
         }
         var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
         if (!pickMode) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         val p = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            TYPE_ACCESSIBILITY_OVERLAY,
             flags,
             PixelFormat.TRANSLUCENT,
         )
@@ -135,7 +138,8 @@ object NodeInspectorOverlay {
             params = p
             Logger.log(
                 "NodeOverlay",
-                "组件检查层已显示：" + nodes.size + " 个组件，模式=" + (if (pickMode) "点击拾取" else "仅显示边框"),
+                "组件检查层已显示：type=2032 无障碍层，锁屏可见；" + nodes.size + " 个组件，模式=" +
+                    (if (pickMode) "点击拾取" else "仅显示边框"),
             )
         } catch (t: Throwable) {
             Logger.error("NodeOverlay", "添加组件检查层失败", t)

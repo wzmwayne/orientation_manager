@@ -47,7 +47,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rowWrite: View
     private lateinit var rowAccessibility: View
     private lateinit var rowNotifications: View
-    private lateinit var rowOverlay: View
     private lateinit var rowSecure: View
     private lateinit var switchPerApp: MaterialSwitch
     private lateinit var switchService: MaterialSwitch
@@ -68,7 +67,6 @@ class MainActivity : AppCompatActivity() {
         rowWrite = findViewById(R.id.row_write)
         rowAccessibility = findViewById(R.id.row_accessibility)
         rowNotifications = findViewById(R.id.row_notifications)
-        rowOverlay = findViewById(R.id.row_overlay)
         rowSecure = findViewById(R.id.row_secure)
         switchPerApp = findViewById(R.id.switch_per_app)
         switchService = findViewById(R.id.switch_service)
@@ -142,13 +140,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }
 
-        rowOverlay.setOnClickListener {
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    .setData(Uri.parse("package:" + packageName)),
-            )
-        }
-
         rowNotifications.setOnClickListener { grantNotifications() }
         rowSecure.setOnClickListener { requestSecureWrite() }
 
@@ -190,8 +181,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 getString(R.string.perm_accessibility_desc)
             }
-        rowOverlay.visibility =
-            if (OverlayForceController.canForce(this)) View.GONE else View.VISIBLE
         rowNotifications.visibility =
             if (NotificationManagerCompat.from(this).areNotificationsEnabled()) {
                 View.GONE
@@ -329,10 +318,7 @@ class MainActivity : AppCompatActivity() {
         val canPrivileged = StrategyManager.active(this, com.orient.manager.core.strategy.StrategyId.SHIZUKU) ||
             StrategyManager.active(this, com.orient.manager.core.strategy.StrategyId.SHELL)
         if (!canWrite && !canOverlay && !canPrivileged) {
-            startActivity(
-                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                    .setData(Uri.parse("package:" + packageName)),
-            )
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             return
         }
         if (!OrientationAccessibilityService.connected) {

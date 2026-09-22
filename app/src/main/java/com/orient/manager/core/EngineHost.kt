@@ -81,8 +81,8 @@ object EngineHost {
             )
             Logger.log(
                 "Engine",
-                "已请求启动常驻通知服务（SYSTEM_ALERT_WINDOW=" +
-                    OverlayForceController.canDrawOverlays(context) + "）",
+                "已请求启动常驻通知服务（无障碍宿主=" +
+                    OverlayForceController.canForce(context) + "）",
             )
         } catch (t: Throwable) {
             notificationRequested = false

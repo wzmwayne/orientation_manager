@@ -64,7 +64,7 @@ Android 的旋转不是"一个设置说了算"，而是 WindowManagerService 按
 | 修改系统设置 (WRITE_SETTINGS) | 设置修改通道 | 可选 |
 | 无障碍服务 | 引擎宿主 + 2032 覆盖层 + 前台应用识别 | **推荐** |
 | 通知权限 | 常驻通知 | 可选 |
-| 悬浮窗 (SYSTEM_ALERT_WINDOW) | 仅当无无障碍时的 2038 回退 | 可选 |
+| ~~悬浮窗 (SYSTEM_ALERT_WINDOW)~~ | **已不再使用**：所有覆盖层（强制旋转 / 检测窗 / 组件拾取）统一用无障碍 2032 | 不需要 |
 | WRITE_SECURE_SETTINGS | 直接管理无障碍启用状态 | 可选（需 adb 授予） |
 | REQUEST_IGNORE_BATTERY_OPTIMIZATIONS | 保活 | 可选 |
 
@@ -82,6 +82,7 @@ adb shell pm grant com.orient.manager android.permission.WRITE_SECURE_SETTINGS
 | 计费 | 订阅 + 买断 + 外部 Key App | **无任何付费内容** |
 | 广告 | AdMob | 无（仅预留接口） |
 | 按应用规则 | Room 数据库 | SharedPreferences + JSON |
+| 覆盖层级 | 仅强制旋转用 2032 | 强制旋转 / 检测窗 / 组件拾取全部 **2032 + SHOW_WHEN_LOCKED**（设置、锁屏等界面均可见） |
 | 日志 | 无 | 落盘 + 一键复制 |
 
 同时运行二者会互相争夺 accelerometer_rotation —— 这是 Android 全局设置的固有限制，无法共存。
