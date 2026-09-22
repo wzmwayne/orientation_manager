@@ -23,38 +23,18 @@ class AdvancedRuleStore(context: Context) {
         }
 
     fun all(): List<AdvancedRule> {
-        migrateIfNeeded()
-        val array = try {
-            JSONArray(sp.getString(KEY_RULES, null) ?: "[]")
-        } catch (t: Throwable) {
-            Logger.error("AdvRule", "解析高级规则失败", t)
-            JSONArray()
+        ensureMigrated()
+        val raw = sp.getString(KEY_RULES, null) ?: "[]"
+        synchronized(lock) {
+            val cached = cache
+            if (cached != null && raw == cacheRaw) return cached
         }
-        val result = ArrayList<AdvancedRule>()
-        for (i in 0 until array.length()) {
-            val obj = array.optJSONObject(i) ?: continue
-            val mode = OrientationMode.entries.firstOrNull { it.name == obj.optString("mode") }
-                ?: continue
-            val conditions = ArrayList<RuleCondition>()
-            val condArray = obj.optJSONArray("conditions")
-            if (condArray != null) {
-                for (j in 0 until condArray.length()) {
-                    val c = condArray.optJSONObject(j) ?: continue
-                    val pattern = c.optString("pattern")
-                    if (pattern.isBlank()) continue
-                    val field = runCatching { RuleField.valueOf(c.optString("field")) }
-                        .getOrDefault(RuleField.ANY)
-                    conditions.add(RuleCondition(field, pattern))
-                }
-            } else if (obj.optString("pattern").isNotBlank()) {
-                val field = runCatching { RuleField.valueOf(obj.optString("field")) }
-                    .getOrDefault(RuleField.ANY)
-                conditions.add(RuleCondition(field, obj.optString("pattern")))
-            }
-            if (conditions.isEmpty()) continue
-            result.add(AdvancedRule(conditions, mode))
+        val parsed = parse(raw)
+        synchronized(lock) {
+            cache = parsed
+            cacheRaw = raw
         }
-        return result
+        return parsed
     }
 
     fun add(rule: AdvancedRule) {
@@ -108,11 +88,14 @@ class AdvancedRuleStore(context: Context) {
                     break
                 }
                 val hit = values.firstOrNull { regex.containsMatchIn(it) }
-                if (hit == null) {
+                val satisfied = if (condition.negate) hit == null else hit != null
+                if (!satisfied) {
                     allMatched = false
                     break
                 }
-                matchedValues.add(condition.field.name + "=" + hit)
+                matchedValues.add(
+                    condition.field.name + (if (condition.negate) "!不匹配" else "=" + hit),
+                )
             }
             if (allMatched && rule.conditions.isNotEmpty()) {
                 Logger.log(
@@ -133,6 +116,40 @@ class AdvancedRuleStore(context: Context) {
         return null
     }
 
+    private fun parse(raw: String): List<AdvancedRule> {
+        val array = try {
+            JSONArray(raw)
+        } catch (t: Throwable) {
+            Logger.error("AdvRule", "解析高级规则失败", t)
+            JSONArray()
+        }
+        val result = ArrayList<AdvancedRule>()
+        for (i in 0 until array.length()) {
+            val obj = array.optJSONObject(i) ?: continue
+            val mode = OrientationMode.entries.firstOrNull { it.name == obj.optString("mode") }
+                ?: continue
+            val conditions = ArrayList<RuleCondition>()
+            val condArray = obj.optJSONArray("conditions")
+            if (condArray != null) {
+                for (j in 0 until condArray.length()) {
+                    val c = condArray.optJSONObject(j) ?: continue
+                    val pattern = c.optString("pattern")
+                    if (pattern.isBlank()) continue
+                    val field = runCatching { RuleField.valueOf(c.optString("field")) }
+                        .getOrDefault(RuleField.ANY)
+                    conditions.add(RuleCondition(field, pattern, c.optBoolean("negate", false)))
+                }
+            } else if (obj.optString("pattern").isNotBlank()) {
+                val field = runCatching { RuleField.valueOf(obj.optString("field")) }
+                    .getOrDefault(RuleField.ANY)
+                conditions.add(RuleCondition(field, obj.optString("pattern")))
+            }
+            if (conditions.isEmpty()) continue
+            result.add(AdvancedRule(conditions, mode))
+        }
+        return result
+    }
+
     private fun compile(pattern: String): Regex? = try {
         Regex(pattern, RegexOption.IGNORE_CASE)
     } catch (t: Throwable) {
@@ -149,18 +166,26 @@ class AdvancedRuleStore(context: Context) {
                 val c = JSONObject()
                 c.put("field", condition.field.name)
                 c.put("pattern", condition.pattern)
+                c.put("negate", condition.negate)
                 condArray.put(c)
             }
             obj.put("conditions", condArray)
             obj.put("mode", rule.mode.name)
             array.put(obj)
         }
-        sp.edit().putString(KEY_RULES, array.toString()).apply()
+        val raw = array.toString()
+        sp.edit().putString(KEY_RULES, raw).apply()
+        synchronized(lock) {
+            cache = list.toList()
+            cacheRaw = raw
+        }
     }
 
-    private fun migrateIfNeeded() {
-        if (sp.getBoolean(KEY_MIGRATED, false)) return
-        sp.edit().putBoolean(KEY_MIGRATED, true).apply()
+    private fun ensureMigrated() {
+        synchronized(lock) {
+            if (migrated) return
+            migrated = true
+        }
         val legacyRules = try {
             legacy.all()
         } catch (t: Throwable) {
@@ -183,6 +208,10 @@ class AdvancedRuleStore(context: Context) {
     private companion object {
         const val KEY_ENABLED = "advanced_rules_enabled"
         const val KEY_RULES = "advanced_rules"
-        const val KEY_MIGRATED = "advanced_rules_migrated"
+
+        private val lock = Any()
+        private var cache: List<AdvancedRule>? = null
+        private var cacheRaw: String? = null
+        private var migrated = false
     }
 }

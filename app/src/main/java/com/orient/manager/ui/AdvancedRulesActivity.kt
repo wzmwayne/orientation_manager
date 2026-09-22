@@ -2,6 +2,8 @@ package com.orient.manager.ui
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -13,6 +15,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.orient.manager.R
 import com.orient.manager.core.ActivityInspector
 import com.orient.manager.core.AdvancedRule
@@ -25,8 +28,13 @@ class AdvancedRulesActivity : AppCompatActivity() {
     private lateinit var store: AdvancedRuleStore
     private lateinit var adapter: RulesAdapter
     private lateinit var emptyView: TextView
+    private lateinit var loadingView: CircularProgressIndicator
     private lateinit var enableSwitch: MaterialSwitch
+    private lateinit var addButton: Button
+
+    private val handler = Handler(Looper.getMainLooper())
     private val rules = mutableListOf<AdvancedRule>()
+    private var loading = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,7 +42,9 @@ class AdvancedRulesActivity : AppCompatActivity() {
 
         store = AdvancedRuleStore(this)
         emptyView = findViewById(R.id.advanced_empty)
+        loadingView = findViewById(R.id.advanced_loading)
         enableSwitch = findViewById(R.id.advanced_enable)
+        addButton = findViewById(R.id.advanced_add)
 
         findViewById<MaterialToolbar>(R.id.toolbar).setNavigationOnClickListener { finish() }
 
@@ -48,33 +58,59 @@ class AdvancedRulesActivity : AppCompatActivity() {
         inspector.isChecked = ActivityInspector.isEnabled(this)
         inspector.setOnCheckedChangeListener { _, checked -> ActivityInspector.setEnabled(this, checked) }
 
-        findViewById<Button>(R.id.advanced_add).setOnClickListener {
-            startActivity(Intent(this, RuleEditActivity::class.java).putExtra(RuleEditActivity.EXTRA_INDEX, -1))
+        addButton.setOnClickListener {
+            startActivity(
+                Intent(this, RuleEditActivity::class.java)
+                    .putExtra(RuleEditActivity.EXTRA_INDEX, -1),
+            )
         }
 
         adapter = RulesAdapter()
         findViewById<ListView>(R.id.advanced_list).adapter = adapter
-        refresh()
+        loadAsync()
     }
 
     override fun onResume() {
         super.onResume()
-        refresh()
+        loadAsync()
     }
 
-    private fun refresh() {
-        rules.clear()
-        rules.addAll(store.all())
-        enableSwitch.isChecked = store.enabled
-        emptyView.visibility = if (rules.isEmpty()) View.VISIBLE else View.GONE
-        adapter.notifyDataSetChanged()
+    private fun loadAsync() {
+        if (loading) return
+        loading = true
+        loadingView.visibility = View.VISIBLE
+        emptyView.visibility = View.GONE
+        enableSwitch.isEnabled = false
+        addButton.isEnabled = false
+        Thread {
+            val loaded = try {
+                store.all()
+            } catch (t: Throwable) {
+                Logger.error("UI", "后台加载高级规则失败", t)
+                emptyList()
+            }
+            val enabled = store.enabled
+            handler.post {
+                if (isFinishing || isDestroyed) return@post
+                rules.clear()
+                rules.addAll(loaded)
+                enableSwitch.isChecked = enabled
+                enableSwitch.isEnabled = true
+                addButton.isEnabled = true
+                loading = false
+                loadingView.visibility = View.GONE
+                emptyView.visibility = if (rules.isEmpty()) View.VISIBLE else View.GONE
+                adapter.notifyDataSetChanged()
+                Logger.log("UI", "高级规则加载完成：" + rules.size + " 条")
+            }
+        }.start()
     }
 
     private fun move(index: Int, delta: Int) {
         if (store.move(index, delta)) {
             Logger.log("UI", "规则 #" + (index + 1) + " 移动 " + (if (delta < 0) "上" else "下"))
             OrientationAccessibilityService.instance?.requestActiveDetection("规则排序")
-            refresh()
+            loadAsync()
         } else {
             Toast.makeText(this, "已到边界", Toast.LENGTH_SHORT).show()
         }

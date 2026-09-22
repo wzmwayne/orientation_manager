@@ -42,11 +42,15 @@ enum class RuleField(@StringRes val labelRes: Int) {
 data class RuleCondition(
     val field: RuleField,
     val pattern: String,
-)
+    val negate: Boolean = false,
+) {
+    fun describe(): String =
+        (if (negate) "不匹配 " else "匹配 ") + field.name + " " + pattern
+}
 
 data class AdvancedRule(
     val conditions: List<RuleCondition>,
     val mode: OrientationMode,
 ) {
-    fun summary(): String = conditions.joinToString(" 且 ") { it.field.name + "=" + it.pattern }
+    fun summary(): String = conditions.joinToString(" 且 ") { it.describe() }
 }

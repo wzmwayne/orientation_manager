@@ -151,4 +151,14 @@
     <string name="rule_edit_delete">删除规则</string>
     <string name="rule_edit_no_condition">至少需要一个条件</string>
     <string name="rule_edit_saved">已保存</string>
+    <string name="cond_menu_behavior">更改行为</string>
+    <string name="cond_menu_pattern">更改字段内容</string>
+    <string name="cond_menu_field">更改匹配字段</string>
+    <string name="cond_menu_delete">删除</string>
+    <string name="cond_edit_behavior">更改行为（是否匹配）</string>
+    <string name="cond_behavior_match">匹配（正向）</string>
+    <string name="cond_behavior_not_match">不匹配（反向）</string>
+    <string name="cond_edit_pattern">更改字段内容（正则）</string>
+    <string name="cond_edit_field">更改匹配字段</string>
+    <string name="advanced_new_rule">新建规则</string>
 </resources>

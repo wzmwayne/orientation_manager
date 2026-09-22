@@ -1,6 +1,7 @@
 package com.orient.manager.ui
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -8,12 +9,14 @@ import android.widget.ArrayAdapter
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ListView
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.orient.manager.R
 import com.orient.manager.core.AdvancedRule
 import com.orient.manager.core.AdvancedRuleStore
@@ -95,6 +98,90 @@ class RuleEditActivity : AppCompatActivity() {
         render()
     }
 
+    private fun editCondition(position: Int) {
+        val condition = conditions.getOrNull(position) ?: return
+        val labels = arrayOf(
+            getString(R.string.cond_menu_behavior),
+            getString(R.string.cond_menu_pattern),
+            getString(R.string.cond_menu_field),
+            getString(R.string.cond_menu_delete),
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(condition.describe())
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> editBehavior(position, condition)
+                    1 -> editPattern(position, condition)
+                    2 -> editField(position, condition)
+                    else -> {
+                        conditions.removeAt(position)
+                        Logger.log("UI", "移除条件 #" + (position + 1))
+                        render()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun editBehavior(position: Int, condition: RuleCondition) {
+        val labels = arrayOf(
+            getString(R.string.cond_behavior_match),
+            getString(R.string.cond_behavior_not_match),
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.cond_edit_behavior)
+            .setItems(labels) { _, which ->
+                conditions[position] = condition.copy(negate = which == 1)
+                Logger.log("UI", "条件 #" + (position + 1) + " 行为改为 " + labels[which])
+                render()
+            }
+            .show()
+    }
+
+    private fun editPattern(position: Int, condition: RuleCondition) {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_TEXT
+            setText(condition.pattern)
+            setSelection(condition.pattern.length)
+        }
+        val container = FrameLayout(this).apply {
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.cond_edit_pattern)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val value = input.text.toString().trim()
+                if (value.isEmpty()) {
+                    Toast.makeText(this, getString(R.string.advanced_need_pattern), Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                if (runCatching { Regex(value) }.isFailure) {
+                    Toast.makeText(this, getString(R.string.advanced_invalid), Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                conditions[position] = condition.copy(pattern = value)
+                Logger.log("UI", "条件 #" + (position + 1) + " 内容改为 " + value)
+                render()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun editField(position: Int, condition: RuleCondition) {
+        val labels = fields.map { getString(it.labelRes) }.toTypedArray()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.cond_edit_field)
+            .setItems(labels) { _, which ->
+                conditions[position] = condition.copy(field = fields[which])
+                Logger.log("UI", "条件 #" + (position + 1) + " 字段改为 " + fields[which].name)
+                render()
+            }
+            .show()
+    }
+
     private fun save() {
         if (conditions.isEmpty()) {
             Toast.makeText(this, getString(R.string.rule_edit_no_condition), Toast.LENGTH_SHORT).show()
@@ -142,13 +229,10 @@ class RuleEditActivity : AppCompatActivity() {
                 ?: LayoutInflater.from(this@RuleEditActivity)
                     .inflate(R.layout.condition_row, parent, false)
             val condition = conditions[position]
-            view.findViewById<TextView>(R.id.condition_field).text = getString(condition.field.labelRes)
+            view.findViewById<TextView>(R.id.condition_field).text =
+                getString(condition.field.labelRes) + (if (condition.negate) "（不匹配）" else "")
             view.findViewById<TextView>(R.id.condition_pattern).text = condition.pattern
-            view.setOnClickListener {
-                conditions.removeAt(position)
-                Logger.log("UI", "移除条件 #" + (position + 1))
-                render()
-            }
+            view.setOnClickListener { editCondition(position) }
             return view
         }
     }
