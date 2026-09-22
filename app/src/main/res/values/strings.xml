@@ -141,7 +141,7 @@
     <string name="rule_field_activity">活动类名</string>
     <string name="rule_field_window_title">窗口标题</string>
     <string name="rule_field_window_class">窗口类名</string>
-    <string name="rule_field_screen_text">界面文本/描述</string>
+    <string name="rule_field_screen_text">界面文本/描述（旧版合并项，已隐藏）</string>
     <string name="rule_field_screen_id">组件 ID</string>
     <string name="rule_field_node_class">组件类名</string>
     <string name="rule_edit_title">编辑规则</string>
@@ -163,4 +163,10 @@
     <string name="advanced_new_rule">新建规则</string>
     <string name="action_delete">删除</string>
     <string name="condition_delete_hint">再次点击删除该条件（2 秒内）</string>
+    <string name="inspector_copy_all">复制全部</string>
+    <string name="inspector_select_mode">选择模式</string>
+    <string name="inspector_select_on">已进入选择模式：长按文本可弹出系统复制菜单（再点一次退出）</string>
+    <string name="inspector_select_off">已退出选择模式</string>
+    <string name="rule_field_node_text">组件文本</string>
+    <string name="rule_field_node_desc">组件描述</string>
 </resources>

@@ -38,7 +38,7 @@ class RuleEditActivity : AppCompatActivity() {
     private lateinit var fieldSpinner: Spinner
     private lateinit var modeSpinner: Spinner
 
-    private val fields = RuleField.entries
+    private val fields = RuleField.visibleEntries
     private val modes = OrientationMode.entries
     private val conditions = mutableListOf<RuleCondition>()
     private val handler = Handler(Looper.getMainLooper())
