@@ -41,6 +41,12 @@ class Prefs(context: Context) {
             sp.edit().putBoolean(KEY_SHELL_GRANTED, value).apply()
         }
 
+    var inspectorEnabled: Boolean
+        get() = sp.getBoolean(KEY_INSPECTOR, false)
+        set(value) {
+            sp.edit().putBoolean(KEY_INSPECTOR, value).apply()
+        }
+
     fun strategyEnabled(id: String, default: Boolean): Boolean =
         sp.getBoolean(KEY_STRATEGY_PREFIX + id, default)
 
@@ -54,6 +60,7 @@ class Prefs(context: Context) {
         const val KEY_OVERRIDE = "override_enabled"
         const val KEY_OVERRIDE_INTERVAL = "override_interval_ms"
         const val KEY_SHELL_GRANTED = "shell_granted"
+        const val KEY_INSPECTOR = "inspector_enabled"
         const val KEY_STRATEGY_PREFIX = "strategy_"
         const val DEFAULT_OVERRIDE_INTERVAL = 300L
     }

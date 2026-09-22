@@ -15,6 +15,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.orient.manager.R
+import com.orient.manager.core.ActivityInspector
 import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationMode
 import com.orient.manager.core.PageRuleStore
@@ -47,6 +48,12 @@ class PageRulesActivity : AppCompatActivity() {
             store.enabled = checked
             Logger.log("UI", "页面规则启用 = " + checked)
             refresh()
+        }
+
+        val inspector = findViewById<MaterialSwitch>(R.id.pages_inspector)
+        inspector.isChecked = ActivityInspector.isEnabled(this)
+        inspector.setOnCheckedChangeListener { _, checked ->
+            ActivityInspector.setEnabled(this, checked)
         }
 
         findViewById<Button>(R.id.pages_detect).setOnClickListener {

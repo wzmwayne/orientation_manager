@@ -16,8 +16,8 @@ android {
         applicationId = "com.orient.manager"
         minSdk = orientMinSdk
         targetSdk = orientTargetSdk
-        versionCode = 22
-        versionName = "0.22.0"
+        versionCode = 23
+        versionName = "0.23.0"
     }
 
     compileOptions {

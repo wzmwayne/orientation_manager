@@ -34,6 +34,7 @@ object EngineHost {
         }
         OrientationController.apply(serviceContext, Prefs(serviceContext).mode)
         syncNotification(serviceContext)
+        if (ActivityInspector.isEnabled(serviceContext)) ActivityInspector.show(serviceContext)
     }
 
     fun stop(reason: String) {
@@ -42,6 +43,7 @@ object EngineHost {
         Logger.warn("Engine", "引擎停止（" + reason + "）：撤销强制窗口与监听")
         RotationEnforcer.stop()
         OverlayForceController.stop()
+        ActivityInspector.hide()
         val ctx = context
         context = null
         if (ctx != null) {

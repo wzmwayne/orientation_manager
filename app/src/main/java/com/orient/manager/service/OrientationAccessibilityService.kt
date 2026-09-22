@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.accessibility.AccessibilityEvent
 import com.orient.manager.R
+import com.orient.manager.core.ActivityInspector
 import com.orient.manager.core.EngineHost
 import com.orient.manager.core.Logger
 import com.orient.manager.core.RuleEngine
@@ -15,8 +16,9 @@ import com.orient.manager.pref.Prefs
 class OrientationAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private var lastPkg: String? = null
-    private var lastClass: String? = null
+    private val activityByPackage = HashMap<String, String>()
+    private var currentPkg: String? = null
+    private var currentActivity: String? = null
     private var lastApplied: String? = null
 
     private val poller = object : Runnable {
@@ -32,8 +34,8 @@ class OrientationAccessibilityService : AccessibilityService() {
         instance = this
         Logger.log(
             "A11y",
-            "无障碍服务已连接：启动事件监听 + 主动检测（每 " + POLL_MS + "ms），" +
-                "canRetrieveWindowContent=" + (serviceInfo?.capabilities?.let { true } ?: true),
+            "无障碍服务已连接：事件监听 + 主动检测（每 " + POLL_MS + "ms）；" +
+                "页面身份只认 WINDOW_STATE_CHANGED 的活动类名，视图类名仅记录",
         )
         EngineHost.start(this)
         ToastNotifier.show(
@@ -47,21 +49,46 @@ class OrientationAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val type = event.eventType
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
-            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED
-        ) {
-            return
-        }
         val pkg = event.packageName?.toString()
         val cls = event.className?.toString()
-        Logger.logThrottled(
-            "A11y",
-            "event",
-            "事件识别[" + eventTypeName(type) + "] pkg=" + pkg + " cls=" + cls,
-            EVENT_LOG_INTERVAL_MS,
-        )
-        handleWindow("事件:" + eventTypeName(type), pkg, cls)
+
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val isActivity = !isViewClass(cls)
+            Logger.logThrottled(
+                "A11y",
+                "eventState",
+                "事件识别[WINDOW_STATE_CHANGED] pkg=" + pkg + " cls=" + cls +
+                    "（" + (if (isActivity) "活动类名" else "视图类名") + "）",
+                EVENT_LOG_INTERVAL_MS,
+            )
+            if (!pkg.isNullOrBlank() && isActivity) {
+                activityByPackage[pkg] = cls!!
+                Logger.log("A11y", "缓存活动类名：" + pkg + " → " + cls)
+            }
+            if (!pkg.isNullOrBlank()) {
+                handleIdentity("事件:WINDOW_STATE_CHANGED", pkg, if (isActivity) cls else activityByPackage[pkg])
+            }
+            return
+        }
+
+        if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
+            Logger.logThrottled(
+                "A11y",
+                "eventContent",
+                "事件识别[WINDOW_CONTENT_CHANGED] pkg=" + pkg + " cls=" + cls +
+                    "（视图类名，不用于页面判定）",
+                EVENT_LOG_INTERVAL_MS,
+            )
+            if (!pkg.isNullOrBlank() && pkg != currentPkg) {
+                handleIdentity("事件:WINDOW_CONTENT_CHANGED", pkg, activityByPackage[pkg])
+            }
+            return
+        }
+
+        if (type == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            Logger.logThrottled("A11y", "eventWindows", "事件识别[WINDOWS_CHANGED]（无包名，触发主动检测）", EVENT_LOG_INTERVAL_MS)
+            detectActiveWindow("事件:WINDOWS_CHANGED")
+        }
     }
 
     fun requestActiveDetection(reason: String) {
@@ -73,42 +100,32 @@ class OrientationAccessibilityService : AccessibilityService() {
         try {
             val root = rootInActiveWindow
             val windowList = windows
-            val pkgRoot = root?.packageName?.toString()
-            val clsRoot = root?.className?.toString()
-            val top = windowList.lastOrNull()
-            val pkgTop = top?.root?.packageName?.toString()
-            val clsTop = top?.root?.className?.toString()
+            val pkg = root?.packageName?.toString() ?: windowList.lastOrNull()?.root?.packageName?.toString()
+            val cached = pkg?.let { activityByPackage[it] }
             Logger.logThrottled(
                 "A11y",
                 "poll",
                 "主动检测(" + source + ")：窗口数=" + windowList.size +
-                    " rootInActiveWindow=" + pkgRoot + "/" + clsRoot +
-                    " 顶层窗口=" + pkgTop + "/" + clsTop,
+                    " 根视图=" + root?.className + " 前台包=" + pkg +
+                    " 缓存活动=" + (cached ?: "无"),
                 POLL_LOG_INTERVAL_MS,
             )
-            val pkg = pkgRoot ?: pkgTop
-            val cls = clsRoot ?: clsTop
-            if (pkg.isNullOrBlank() && cls.isNullOrBlank()) {
+            if (pkg.isNullOrBlank()) {
                 Logger.logThrottled(
                     "A11y",
                     "pollEmpty",
-                    "主动检测未取到窗口信息：请确认无障碍配置已开启 canRetrieveWindowContent " +
-                        "与 flagRetrieveInteractiveWindows（需重新开启无障碍服务生效）",
+                    "主动检测未取到前台包名（检查 canRetrieveWindowContent / flagRetrieveInteractiveWindows）",
                     5000L,
                 )
                 return
             }
-            handleWindow(source, pkg, cls)
+            handleIdentity(source, pkg, cached)
         } catch (t: Throwable) {
             Logger.error("A11y", "主动检测异常(" + source + ")", t)
         }
     }
 
-    private fun handleWindow(source: String, pkg: String?, cls: String?) {
-        if (pkg.isNullOrBlank()) {
-            Logger.logThrottled("A11y", "noPkg", "无法识别前台包名(" + source + ")", 5000L)
-            return
-        }
+    private fun handleIdentity(source: String, pkg: String, activityClass: String?) {
         if (pkg == packageName) {
             Logger.logThrottled("A11y", "self", "前台为本应用，跳过(" + source + ")", 5000L)
             return
@@ -117,26 +134,28 @@ class OrientationAccessibilityService : AccessibilityService() {
             Logger.logThrottled("A11y", "ignored", "忽略系统界面 " + pkg, 5000L)
             return
         }
-        if (pkg == lastPkg && cls == lastClass) {
+        if (pkg == currentPkg && activityClass == currentActivity) {
             Logger.logThrottled(
                 "A11y",
                 "same",
-                "界面未变化(" + source + ")：" + pkg + " / " + cls,
+                "界面未变化(" + source + ")：" + pkg + " / " + (activityClass ?: "未知活动"),
                 5000L,
             )
             return
         }
         Logger.log(
             "A11y",
-            "界面切换[" + source + "] " + (lastPkg ?: "-") + "/" + (lastClass ?: "-") +
-                "  →  " + pkg + " / " + cls,
+            "界面切换[" + source + "] " + (currentPkg ?: "-") + "/" + (currentActivity ?: "-") +
+                "  →  " + pkg + " / " + (activityClass ?: "未知活动"),
         )
-        lastPkg = pkg
-        lastClass = cls
+        currentPkg = pkg
+        currentActivity = activityClass
         lastPackage = pkg
-        lastActivityClass = cls
+        lastActivityClass = activityClass
 
-        val resolution = RuleEngine.applyForForeground(this, pkg, cls) ?: return
+        ActivityInspector.onIdentityChanged(pkg, activityClass)
+
+        val resolution = RuleEngine.applyForForeground(this, pkg, activityClass) ?: return
         val key = resolution.source + "->" + resolution.mode.name
         if (key != lastApplied) {
             lastApplied = key
@@ -152,11 +171,14 @@ class OrientationAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun eventTypeName(type: Int): String = when (type) {
-        AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "WINDOW_STATE_CHANGED"
-        AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "WINDOW_CONTENT_CHANGED"
-        AccessibilityEvent.TYPE_WINDOWS_CHANGED -> "WINDOWS_CHANGED"
-        else -> type.toString()
+    private fun isViewClass(cls: String?): Boolean {
+        if (cls.isNullOrBlank()) return true
+        return cls.startsWith("android.widget.") ||
+            cls.startsWith("android.view.") ||
+            cls.startsWith("android.webkit.") ||
+            cls.startsWith("androidx.compose.ui.") ||
+            cls.startsWith("androidx.recyclerview.") ||
+            cls == "android.app.Dialog"
     }
 
     override fun onInterrupt() = Unit
