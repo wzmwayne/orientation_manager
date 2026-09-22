@@ -7,34 +7,38 @@ import java.text.SimpleDateFormat
 import java.util.ArrayDeque
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 object Logger {
 
     private const val MAX_ENTRIES = 2000
     private const val MAX_FILE_BYTES = 512 * 1024L
     private const val KEEP_LINES_ON_TRIM = 1000
+    private const val TRIM_EVERY_APPENDS = 200
 
     private val entries = ArrayDeque<String>()
     private val timeFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.US)
+    private val timeLock = Any()
     private val throttleAt = HashMap<String, Long>()
+
+    private val pendingLines = ConcurrentLinkedQueue<String>()
+    private val flushing = AtomicBoolean(false)
+    private val io: ExecutorService = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "orient-log").apply { isDaemon = true }
+    }
+
+    @Volatile
     private var logFile: File? = null
     private var appendCount = 0
 
     fun init(context: Context) {
-        try {
-            val file = File(context.filesDir, "orient_log.txt")
-            logFile = file
-            if (file.exists() && file.length() > 0) {
-                val history = file.readLines().takeLast(MAX_ENTRIES)
-                synchronized(entries) {
-                    entries.clear()
-                    history.forEach { entries.addLast(it) }
-                }
-            }
-            append("I", "Log", "日志系统启动，已恢复历史 " + size() + " 行")
-        } catch (t: Throwable) {
-            logFile = null
-        }
+        val file = File(context.filesDir, "orient_log.txt")
+        logFile = file
+        io.execute { restoreHistory(file) }
+        append("I", "Log", "日志系统启动")
     }
 
     fun log(tag: String, message: String) = append("I", tag, message)
@@ -52,9 +56,9 @@ object Logger {
 
     fun logThrottled(tag: String, key: String, message: String, intervalMs: Long = 1000L) {
         val now = System.currentTimeMillis()
-        val last = throttleAt[key] ?: 0L
+        val last = synchronized(throttleAt) { throttleAt[key] ?: 0L }
         if (now - last < intervalMs) return
-        throttleAt[key] = now
+        synchronized(throttleAt) { throttleAt[key] = now }
         append("I", tag, message)
     }
 
@@ -66,32 +70,80 @@ object Logger {
 
     fun clear() {
         synchronized(entries) { entries.clear() }
-        throttleAt.clear()
-        try {
-            logFile?.delete()
-        } catch (t: Throwable) {
-            // ignore
+        synchronized(throttleAt) { throttleAt.clear() }
+        pendingLines.clear()
+        io.execute {
+            try {
+                logFile?.delete()
+            } catch (t: Throwable) {
+                // ignore
+            }
         }
         append("I", "Log", "日志已清空")
     }
 
     private fun append(level: String, tag: String, message: String) {
-        val line = timeFormat.format(Date()) + "  " + level + "/" + tag + "  " + message
+        val line = timestamp() + "  " + level + "/" + tag + "  " + message
         synchronized(entries) {
             entries.addLast(line)
             while (entries.size > MAX_ENTRIES) entries.removeFirst()
         }
-        writeToFile(line)
+        enqueue(line)
     }
 
-    private fun writeToFile(line: String) {
-        val file = logFile ?: return
+    private fun timestamp(): String = synchronized(timeLock) { timeFormat.format(Date()) }
+
+    private fun restoreHistory(file: File) {
         try {
-            FileOutputStream(file, true).use { it.write((line + "\n").toByteArray()) }
-            appendCount++
-            if (appendCount % 200 == 0) trimIfNeeded(file)
+            if (!file.exists() || file.length() == 0L) return
+            val history = file.readLines().takeLast(MAX_ENTRIES)
+            synchronized(entries) {
+                if (entries.isNotEmpty()) return
+                history.forEach { entries.addLast(it) }
+            }
         } catch (t: Throwable) {
-            // disk write is best effort
+            // history is best effort
+        }
+    }
+
+    private fun enqueue(line: String) {
+        pendingLines.add(line)
+        if (!flushing.compareAndSet(false, true)) return
+        try {
+            io.execute { flush() }
+        } catch (t: Throwable) {
+            flushing.set(false)
+        }
+    }
+
+    private fun flush() {
+        val batch = StringBuilder()
+        var count = 0
+        while (true) {
+            val line = pendingLines.poll() ?: break
+            batch.append(line).append('\n')
+            count++
+        }
+        val file = logFile
+        if (file != null && count > 0) {
+            try {
+                FileOutputStream(file, true).use { it.write(batch.toString().toByteArray()) }
+                appendCount += count
+                if (appendCount >= TRIM_EVERY_APPENDS) {
+                    appendCount = 0
+                    trimIfNeeded(file)
+                }
+            } catch (t: Throwable) {
+                // disk write is best effort
+            }
+        }
+        flushing.set(false)
+        if (pendingLines.isNotEmpty() && flushing.compareAndSet(false, true)) {
+            try {
+                io.execute { flush() }
+            } catch (t: Throwable) {
+                flushing.set(false)
+            }
         }
     }
 

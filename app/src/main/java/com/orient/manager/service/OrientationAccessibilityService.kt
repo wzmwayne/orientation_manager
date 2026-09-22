@@ -1,42 +1,69 @@
 package com.orient.manager.service
 
 import android.accessibilityservice.AccessibilityService
-import android.content.Intent
+import android.graphics.Rect
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.orient.manager.R
 import com.orient.manager.core.ActivityInspector
 import com.orient.manager.core.EngineHost
 import com.orient.manager.core.Logger
+import com.orient.manager.core.NodeInfo
 import com.orient.manager.core.RuleEngine
 import com.orient.manager.core.ToastNotifier
+import com.orient.manager.core.UiState
 import com.orient.manager.core.WindowInfo
 import com.orient.manager.core.WindowSnapshot
 import com.orient.manager.pref.Prefs
+import java.util.concurrent.ConcurrentHashMap
 
 class OrientationAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-    private val activityByPackage = HashMap<String, String>()
+    private val activityByPackage = ConcurrentHashMap<String, String>()
+
+    private var workerThread: HandlerThread? = null
+    private var worker: Handler? = null
+    private val queueLock = Any()
+    private var pendingSource: String? = null
+    private var pendingForce = false
+    private var scheduled = false
+    private var lastRunAt = 0L
+
     private var lastSignature: String? = null
+    private var lastIdentity = "-"
+
+    @Volatile
+    private var imePackage: String? = null
+
     private var lastApplied: String? = null
 
     private val poller = object : Runnable {
         override fun run() {
-            refreshIdentity("主动轮询")
+            schedule("主动轮询", false)
             handler.postDelayed(this, POLL_MS)
         }
     }
+
+    private val drainTask = Runnable { drain() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         connected = true
         instance = this
+        imePackage = currentImePackage()
+        val thread = HandlerThread("orient-a11y").also { it.start() }
+        workerThread = thread
+        worker = Handler(thread.looper)
         Logger.log(
             "A11y",
-            "无障碍服务已连接：事件监听 + 主动检测（每 " + POLL_MS + "ms）；" +
-                "活动类名取自 WINDOW_STATE_CHANGED 并按包缓存；候选=包名/活动/窗口类名/窗口标题",
+            "无障碍服务已连接：事件在后台线程检测（每 " + POLL_MS + "ms 轮询）；" +
+                "活动类名取自 WINDOW_STATE_CHANGED 并按包缓存；本应用界面与输入法窗口一律跳过",
         )
         EngineHost.start(this)
         ToastNotifier.show(
@@ -49,122 +76,107 @@ class OrientationAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
-                val pkg = event.packageName?.toString()
-                val cls = event.className?.toString()
-                val isActivity = !isViewClass(cls)
-                Logger.logThrottled(
-                    "A11y",
-                    "eventState",
-                    "事件识别[WINDOW_STATE_CHANGED] pkg=" + pkg + " cls=" + cls +
-                        "（" + (if (isActivity) "活动类名" else "视图类名") + "）",
-                    EVENT_LOG_INTERVAL_MS,
-                )
-                if (!pkg.isNullOrBlank() && isActivity) {
-                    activityByPackage[pkg] = cls!!
-                    Logger.log("A11y", "缓存活动类名：" + pkg + " → " + cls)
-                }
-                refreshIdentity("事件:WINDOW_STATE_CHANGED")
-            }
-
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> {
-                Logger.logThrottled(
-                    "A11y",
-                    "eventContent",
-                    "事件识别[WINDOW_CONTENT_CHANGED] pkg=" + event.packageName +
-                        " cls=" + event.className + "（视图类名，仅用于触发检测）",
-                    EVENT_LOG_INTERVAL_MS,
-                )
-                refreshIdentity("事件:WINDOW_CONTENT_CHANGED")
-            }
-
-            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
-                Logger.logThrottled(
-                    "A11y",
-                    "eventWindows",
-                    "事件识别[WINDOWS_CHANGED]（触发主动检测）",
-                    EVENT_LOG_INTERVAL_MS,
-                )
-                refreshIdentity("事件:WINDOWS_CHANGED")
+        val type = event.eventType
+        if (
+            type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            type != AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        ) {
+            return
+        }
+        val pkg = event.packageName?.toString()
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val cls = event.className?.toString()
+            if (!pkg.isNullOrBlank() && !isViewClass(cls)) {
+                activityByPackage[pkg] = cls!!
+                Logger.log("A11y", "缓存活动类名：" + pkg + " → " + cls)
             }
         }
+        if (shouldSkip(pkg)) return
+        Logger.logThrottled(
+            "A11y",
+            "event" + type,
+            "事件识别[type=" + type + "] pkg=" + pkg + " cls=" + event.className + "（触发后台检测）",
+            EVENT_LOG_INTERVAL_MS,
+        )
+        schedule("事件:type=" + type, false)
+    }
+
+    private fun shouldSkip(pkg: String?): Boolean {
+        if (pkg.isNullOrBlank()) return true
+        if (pkg == packageName) return true
+        if (IGNORED.contains(pkg)) return true
+        return pkg == imePackage
+    }
+
+    private fun currentImePackage(): String? = try {
+        Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+            ?.substringBefore('/')
+            ?.takeIf { it.isNotBlank() }
+    } catch (t: Throwable) {
+        null
     }
 
     fun requestActiveDetection(reason: String) {
         Logger.log("A11y", "收到主动检测请求：" + reason)
-        refreshIdentity(reason, force = true)
+        schedule(reason, true)
     }
 
-    private fun buildSnapshot(): WindowSnapshot {
-        val root = rootInActiveWindow
-        val windowList = windows
-        val pkg = root?.packageName?.toString()
-            ?: windowList.lastOrNull()?.root?.packageName?.toString()
-        val activity = pkg?.let { activityByPackage[it] }
-        val infos = ArrayList<WindowInfo>(windowList.size)
-        for (window in windowList) {
-            infos.add(
-                WindowInfo(
-                    id = window.id,
-                    type = window.type,
-                    layer = window.layer,
-                    pkg = window.root?.packageName?.toString(),
-                    rootClass = window.root?.className?.toString(),
-                    title = try {
-                        window.title?.toString()
-                    } catch (t: Throwable) {
-                        null
-                    },
-                    focused = window.isFocused,
-                    active = window.isActive,
-                ),
-            )
+    private fun schedule(source: String, force: Boolean) {
+        val current = worker ?: return
+        val delay: Long
+        synchronized(queueLock) {
+            pendingSource = source
+            if (force) pendingForce = true
+            if (scheduled) return
+            scheduled = true
+            val elapsed = SystemClock.uptimeMillis() - lastRunAt
+            delay = if (elapsed >= MIN_INTERVAL_MS) 0L else MIN_INTERVAL_MS - elapsed
         }
-        return WindowSnapshot(pkg, activity, infos, collectNodes(root))
+        current.postDelayed(drainTask, delay)
     }
 
-
-    private fun collectNodes(root: android.view.accessibility.AccessibilityNodeInfo?): List<com.orient.manager.core.NodeInfo> {
-        if (root == null) return emptyList()
-        val result = ArrayList<com.orient.manager.core.NodeInfo>()
-        val queue = ArrayDeque<Pair<android.view.accessibility.AccessibilityNodeInfo, Int>>()
-        queue.add(root to 0)
-        var scanned = 0
-        while (queue.isNotEmpty() && result.size < MAX_NODES && scanned < MAX_SCAN) {
-            scanned++
-            val (node, depth) = queue.removeFirst()
+    private fun drain() {
+        var rounds = 0
+        while (rounds < MAX_ROUNDS_PER_DRAIN) {
+            var source: String? = null
+            var force = false
+            synchronized(queueLock) {
+                source = pendingSource
+                force = pendingForce
+                pendingSource = null
+                pendingForce = false
+            }
+            val requested = source ?: break
+            rounds++
+            lastRunAt = SystemClock.uptimeMillis()
             try {
-                if (node.isVisibleToUser) {
-                    val rect = android.graphics.Rect()
-                    node.getBoundsInScreen(rect)
-                    if (rect.width() > 0 && rect.height() > 0) {
-                        result.add(
-                            com.orient.manager.core.NodeInfo(
-                                className = node.className?.toString(),
-                                text = node.text?.toString(),
-                                desc = node.contentDescription?.toString(),
-                                viewId = node.viewIdResourceName,
-                                pkg = node.packageName?.toString(),
-                                bounds = rect,
-                                clickable = node.isClickable,
-                                depth = depth,
-                            ),
-                        )
-                    }
-                }
-                for (i in 0 until node.childCount) {
-                    val child = node.getChild(i) ?: continue
-                    queue.add(child to (depth + 1))
-                }
+                detect(requested, force)
             } catch (t: Throwable) {
-                Logger.error("A11y", "节点遍历异常", t)
+                Logger.error("A11y", "检测异常(" + requested + ")", t)
             }
         }
-        return result
+        var next: String? = null
+        var nextForce = false
+        synchronized(queueLock) {
+            scheduled = false
+            next = pendingSource
+            nextForce = pendingForce
+        }
+        val nextSource = next
+        if (nextSource != null) schedule(nextSource, nextForce)
     }
 
-    private fun refreshIdentity(source: String, force: Boolean = false) {
+    private fun detect(source: String, force: Boolean) {
+        if (UiState.foreground) {
+            Logger.logThrottled(
+                "A11y",
+                "selfUi",
+                "本应用界面在前台，跳过窗口检测(" + source + ")",
+                5000L,
+            )
+            return
+        }
         val snapshot = try {
             buildSnapshot()
         } catch (t: Throwable) {
@@ -210,16 +222,19 @@ class OrientationAccessibilityService : AccessibilityService() {
             )
             return
         }
-        Logger.log(
-            "A11y",
-            "界面变化[" + source + "] " + (lastSignature ?: "-") + "  →  " + signature,
-        )
+        val identity = pkg + " / " + (snapshot.activityClass ?: "未知")
+        Logger.log("A11y", "界面变化[" + source + "] " + lastIdentity + "  →  " + identity)
         lastSignature = signature
+        lastIdentity = identity
         lastPackage = pkg
         lastActivityClass = snapshot.activityClass
 
-        ActivityInspector.update(snapshot, packageName)
+        handler.post { onSnapshot(snapshot) }
+    }
 
+    private fun onSnapshot(snapshot: WindowSnapshot) {
+        if (!connected) return
+        ActivityInspector.update(snapshot, packageName)
         val resolution = RuleEngine.applyForForeground(this, snapshot) ?: return
         val key = resolution.source + "->" + resolution.mode.name
         if (key != lastApplied) {
@@ -236,6 +251,73 @@ class OrientationAccessibilityService : AccessibilityService() {
         }
     }
 
+    private fun buildSnapshot(): WindowSnapshot {
+        val root = rootInActiveWindow
+        val windowList = windows
+        val pkg = root?.packageName?.toString()
+            ?: windowList.lastOrNull()?.root?.packageName?.toString()
+        val activity = pkg?.let { activityByPackage[it] }
+        val infos = ArrayList<WindowInfo>(windowList.size)
+        for (window in windowList) {
+            infos.add(
+                WindowInfo(
+                    id = window.id,
+                    type = window.type,
+                    layer = window.layer,
+                    pkg = window.root?.packageName?.toString(),
+                    rootClass = window.root?.className?.toString(),
+                    title = try {
+                        window.title?.toString()
+                    } catch (t: Throwable) {
+                        null
+                    },
+                    focused = window.isFocused,
+                    active = window.isActive,
+                ),
+            )
+        }
+        return WindowSnapshot(pkg, activity, infos, collectNodes(root))
+    }
+
+    private fun collectNodes(root: AccessibilityNodeInfo?): List<NodeInfo> {
+        if (root == null) return emptyList()
+        val result = ArrayList<NodeInfo>()
+        val queue = ArrayDeque<Pair<AccessibilityNodeInfo, Int>>()
+        queue.add(root to 0)
+        var scanned = 0
+        while (queue.isNotEmpty() && result.size < MAX_NODES && scanned < MAX_SCAN) {
+            scanned++
+            val (node, depth) = queue.removeFirst()
+            try {
+                if (node.isVisibleToUser) {
+                    val rect = Rect()
+                    node.getBoundsInScreen(rect)
+                    if (rect.width() > 0 && rect.height() > 0) {
+                        result.add(
+                            NodeInfo(
+                                className = node.className?.toString(),
+                                text = node.text?.toString(),
+                                desc = node.contentDescription?.toString(),
+                                viewId = node.viewIdResourceName,
+                                pkg = node.packageName?.toString(),
+                                bounds = rect,
+                                clickable = node.isClickable,
+                                depth = depth,
+                            ),
+                        )
+                    }
+                }
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i) ?: continue
+                    queue.add(child to (depth + 1))
+                }
+            } catch (t: Throwable) {
+                Logger.error("A11y", "节点遍历异常", t)
+            }
+        }
+        return result
+    }
+
     private fun isViewClass(cls: String?): Boolean {
         if (cls.isNullOrBlank()) return true
         return cls.startsWith("android.widget.") ||
@@ -248,10 +330,10 @@ class OrientationAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() = Unit
 
-    override fun onUnbind(intent: Intent?): Boolean {
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
         connected = false
         instance = null
-        handler.removeCallbacks(poller)
+        stopWorker()
         Logger.warn("A11y", "无障碍服务已解绑")
         EngineHost.stop("无障碍解绑")
         return super.onUnbind(intent)
@@ -260,10 +342,23 @@ class OrientationAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         connected = false
         instance = null
-        handler.removeCallbacks(poller)
+        stopWorker()
         Logger.warn("A11y", "无障碍服务已销毁")
         EngineHost.stop("无障碍销毁")
         super.onDestroy()
+    }
+
+    private fun stopWorker() {
+        handler.removeCallbacks(poller)
+        val thread = workerThread ?: return
+        workerThread = null
+        worker = null
+        synchronized(queueLock) {
+            pendingSource = null
+            pendingForce = false
+            scheduled = false
+        }
+        thread.quitSafely()
     }
 
     companion object {
@@ -272,6 +367,8 @@ class OrientationAccessibilityService : AccessibilityService() {
         private const val EVENT_LOG_INTERVAL_MS = 400L
         private const val MAX_NODES = 200
         private const val MAX_SCAN = 800
+        private const val MIN_INTERVAL_MS = 60L
+        private const val MAX_ROUNDS_PER_DRAIN = 3
 
         private val IGNORED = setOf("com.android.systemui")
 

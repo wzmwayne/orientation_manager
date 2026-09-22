@@ -118,6 +118,7 @@ adb shell pm grant com.orient.manager android.permission.WRITE_SECURE_SETTINGS
 | Overlay 初始化窗口组件 type=2032 | 是否使用了特权覆盖层 |
 | Watch 引擎存活 … displayRotation=… | 引擎存活 + 系统实际旋转角 |
 | Enforce … 被改为 … 已回写 | 有外部程序在抢字段 |
+| 本应用界面在前台，跳过窗口检测 | 本应用自己的界面不参与检测，避免无障碍查询回环导致输入卡顿 |
 
 ## 已知限制
 
