@@ -32,11 +32,28 @@ class PageRuleStore(context: Context) {
     }
 
     fun match(activityClass: String?): PageMatch? {
-        if (!enabled) return null
-        if (activityClass.isNullOrBlank()) return null
+        val rules = all()
+        if (!enabled) {
+            Logger.logThrottled(
+                "PageRule",
+                "disabled",
+                "页面规则已关闭，跳过匹配（类名=" + activityClass + "，规则数=" + rules.size + "）",
+                5000L,
+            )
+            return null
+        }
+        if (activityClass.isNullOrBlank()) {
+            Logger.logThrottled(
+                "PageRule",
+                "noClass",
+                "未取到活动类名，无法匹配页面规则（规则数=" + rules.size + "）",
+                3000L,
+            )
+            return null
+        }
         val lower = activityClass.lowercase()
         var best: PageMatch? = null
-        for ((pattern, mode) in all()) {
+        for ((pattern, mode) in rules) {
             if (pattern.isBlank()) continue
             if (!lower.contains(pattern.lowercase())) continue
             val current = best
@@ -44,6 +61,12 @@ class PageRuleStore(context: Context) {
                 best = PageMatch(pattern, mode)
             }
         }
+        Logger.log(
+            "PageRule",
+            "页面匹配：类名=" + activityClass + "，规则数=" + rules.size +
+                "，命中=" + (best?.pattern ?: "无") +
+                (best?.let { " → " + it.mode.name } ?: ""),
+        )
         return best
     }
 

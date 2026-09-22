@@ -121,4 +121,5 @@
     <string name="pages_delete">删除该规则</string>
     <string name="pages_invalid">请输入活动类名</string>
     <string name="pages_choose_mode">选择该页面的方向</string>
+    <string name="pages_detect">立即检测</string>
 </resources>

@@ -49,6 +49,17 @@ class PageRulesActivity : AppCompatActivity() {
             refresh()
         }
 
+        findViewById<Button>(R.id.pages_detect).setOnClickListener {
+            val service = OrientationAccessibilityService.instance
+            if (service == null) {
+                Toast.makeText(this, getString(R.string.pages_current_none), Toast.LENGTH_SHORT).show()
+            } else {
+                service.requestActiveDetection("用户手动点击")
+                Toast.makeText(this, getString(R.string.pages_detect), Toast.LENGTH_SHORT).show()
+            }
+            currentView.postDelayed({ refresh() }, 300)
+        }
+
         findViewById<Button>(R.id.pages_add).setOnClickListener {
             val pattern = input.text.toString().trim()
             if (pattern.isEmpty()) {
