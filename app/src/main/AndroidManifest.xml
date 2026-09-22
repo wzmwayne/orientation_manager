@@ -44,6 +44,11 @@
         </activity>
 
         <activity
+            android:name=".ui.RuleEditActivity"
+            android:exported="false"
+            android:label="@string/rule_edit_title" />
+
+        <activity
             android:name=".ui.AdvancedRulesActivity"
             android:exported="false"
             android:label="@string/advanced_title" />

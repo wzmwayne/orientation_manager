@@ -7,7 +7,7 @@ import org.json.JSONObject
 data class RuleMatch(
     val index: Int,
     val rule: AdvancedRule,
-    val matchedValue: String,
+    val matchedValues: List<String>,
 )
 
 class AdvancedRuleStore(context: Context) {
@@ -33,13 +33,26 @@ class AdvancedRuleStore(context: Context) {
         val result = ArrayList<AdvancedRule>()
         for (i in 0 until array.length()) {
             val obj = array.optJSONObject(i) ?: continue
-            val pattern = obj.optString("pattern")
-            val field = runCatching { RuleField.valueOf(obj.optString("field")) }
-                .getOrDefault(RuleField.ANY)
             val mode = OrientationMode.entries.firstOrNull { it.name == obj.optString("mode") }
                 ?: continue
-            if (pattern.isBlank()) continue
-            result.add(AdvancedRule(pattern, field, mode))
+            val conditions = ArrayList<RuleCondition>()
+            val condArray = obj.optJSONArray("conditions")
+            if (condArray != null) {
+                for (j in 0 until condArray.length()) {
+                    val c = condArray.optJSONObject(j) ?: continue
+                    val pattern = c.optString("pattern")
+                    if (pattern.isBlank()) continue
+                    val field = runCatching { RuleField.valueOf(c.optString("field")) }
+                        .getOrDefault(RuleField.ANY)
+                    conditions.add(RuleCondition(field, pattern))
+                }
+            } else if (obj.optString("pattern").isNotBlank()) {
+                val field = runCatching { RuleField.valueOf(obj.optString("field")) }
+                    .getOrDefault(RuleField.ANY)
+                conditions.add(RuleCondition(field, obj.optString("pattern")))
+            }
+            if (conditions.isEmpty()) continue
+            result.add(AdvancedRule(conditions, mode))
         }
         return result
     }
@@ -64,6 +77,16 @@ class AdvancedRuleStore(context: Context) {
         save(list)
     }
 
+    fun move(index: Int, delta: Int): Boolean {
+        val list = all().toMutableList()
+        val target = index + delta
+        if (index !in list.indices || target !in list.indices) return false
+        val item = list.removeAt(index)
+        list.add(target, item)
+        save(list)
+        return true
+    }
+
     fun match(snapshot: WindowSnapshot, ownerPackage: String): RuleMatch? {
         if (!enabled) {
             Logger.logThrottled("AdvRule", "disabled", "高级规则已关闭", 5000L)
@@ -75,24 +98,36 @@ class AdvancedRuleStore(context: Context) {
             return null
         }
         for ((index, rule) in rules.withIndex()) {
-            val values = rule.field.valuesFor(snapshot, ownerPackage)
-            if (values.isEmpty()) continue
-            val regex = compile(rule.pattern) ?: continue
-            val hit = values.firstOrNull { regex.containsMatchIn(it) }
-            if (hit != null) {
+            val matchedValues = ArrayList<String>()
+            var allMatched = true
+            for (condition in rule.conditions) {
+                val values = condition.field.valuesFor(snapshot, ownerPackage)
+                val regex = compile(condition.pattern)
+                if (regex == null) {
+                    allMatched = false
+                    break
+                }
+                val hit = values.firstOrNull { regex.containsMatchIn(it) }
+                if (hit == null) {
+                    allMatched = false
+                    break
+                }
+                matchedValues.add(condition.field.name + "=" + hit)
+            }
+            if (allMatched && rule.conditions.isNotEmpty()) {
                 Logger.log(
                     "AdvRule",
-                    "命中 #" + (index + 1) + " 字段=" + rule.field.name +
-                        " 正则=" + rule.pattern + " 值=" + hit + " → " + rule.mode.name,
+                    "命中 #" + (index + 1) + " 条件 " + rule.conditions.size + " 个全部满足：" +
+                        matchedValues.joinToString(" | ") + " → " + rule.mode.name,
                 )
-                return RuleMatch(index, rule, hit)
+                return RuleMatch(index, rule, matchedValues)
             }
         }
         Logger.logThrottled(
             "AdvRule",
             "noHit",
             "高级规则未命中：规则 " + rules.size + " 条，候选 " +
-                snapshot.candidateValues(ownerPackage).size + " 个",
+                snapshot.candidateValues(ownerPackage).size + " 个，节点 " + snapshot.nodes.size,
             2000L,
         )
         return null
@@ -109,8 +144,14 @@ class AdvancedRuleStore(context: Context) {
         val array = JSONArray()
         for (rule in list) {
             val obj = JSONObject()
-            obj.put("pattern", rule.pattern)
-            obj.put("field", rule.field.name)
+            val condArray = JSONArray()
+            for (condition in rule.conditions) {
+                val c = JSONObject()
+                c.put("field", condition.field.name)
+                c.put("pattern", condition.pattern)
+                condArray.put(c)
+            }
+            obj.put("conditions", condArray)
             obj.put("mode", rule.mode.name)
             array.put(obj)
         }
@@ -128,10 +169,15 @@ class AdvancedRuleStore(context: Context) {
         if (legacyRules.isEmpty()) return
         val list = all().toMutableList()
         legacyRules.forEach { (pattern, mode) ->
-            list.add(AdvancedRule(Regex.escape(pattern), RuleField.ANY, mode))
+            list.add(
+                AdvancedRule(
+                    listOf(RuleCondition(RuleField.ANY, Regex.escape(pattern))),
+                    mode,
+                ),
+            )
         }
         save(list)
-        Logger.log("AdvRule", "已从旧的页面规则迁移 " + legacyRules.size + " 条为高级规则（全部字段 + 正则转义）")
+        Logger.log("AdvRule", "已从旧的页面规则迁移 " + legacyRules.size + " 条（全部字段 + 正则转义）")
     }
 
     private companion object {

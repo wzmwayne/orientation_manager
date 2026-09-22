@@ -121,7 +121,47 @@ class OrientationAccessibilityService : AccessibilityService() {
                 ),
             )
         }
-        return WindowSnapshot(pkg, activity, infos)
+        return WindowSnapshot(pkg, activity, infos, collectNodes(root))
+    }
+
+
+    private fun collectNodes(root: android.view.accessibility.AccessibilityNodeInfo?): List<com.orient.manager.core.NodeInfo> {
+        if (root == null) return emptyList()
+        val result = ArrayList<com.orient.manager.core.NodeInfo>()
+        val queue = ArrayDeque<Pair<android.view.accessibility.AccessibilityNodeInfo, Int>>()
+        queue.add(root to 0)
+        var scanned = 0
+        while (queue.isNotEmpty() && result.size < MAX_NODES && scanned < MAX_SCAN) {
+            scanned++
+            val (node, depth) = queue.removeFirst()
+            try {
+                if (node.isVisibleToUser) {
+                    val rect = android.graphics.Rect()
+                    node.getBoundsInScreen(rect)
+                    if (rect.width() > 0 && rect.height() > 0) {
+                        result.add(
+                            com.orient.manager.core.NodeInfo(
+                                className = node.className?.toString(),
+                                text = node.text?.toString(),
+                                desc = node.contentDescription?.toString(),
+                                viewId = node.viewIdResourceName,
+                                pkg = node.packageName?.toString(),
+                                bounds = rect,
+                                clickable = node.isClickable,
+                                depth = depth,
+                            ),
+                        )
+                    }
+                }
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i) ?: continue
+                    queue.add(child to (depth + 1))
+                }
+            } catch (t: Throwable) {
+                Logger.error("A11y", "节点遍历异常", t)
+            }
+        }
+        return result
     }
 
     private fun refreshIdentity(source: String, force: Boolean = false) {
@@ -230,6 +270,8 @@ class OrientationAccessibilityService : AccessibilityService() {
         const val POLL_MS = 800L
         private const val POLL_LOG_INTERVAL_MS = 3000L
         private const val EVENT_LOG_INTERVAL_MS = 400L
+        private const val MAX_NODES = 200
+        private const val MAX_SCAN = 800
 
         private val IGNORED = setOf("com.android.systemui")
 

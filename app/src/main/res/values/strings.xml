@@ -141,4 +141,14 @@
     <string name="rule_field_activity">活动类名</string>
     <string name="rule_field_window_title">窗口标题</string>
     <string name="rule_field_window_class">窗口类名</string>
+    <string name="rule_field_screen_text">界面文本/描述</string>
+    <string name="rule_field_screen_id">组件 ID</string>
+    <string name="rule_field_node_class">组件类名</string>
+    <string name="rule_edit_title">编辑规则</string>
+    <string name="rule_edit_conditions">条件：全部满足才激活（正则，忽略大小写）</string>
+    <string name="rule_edit_add_condition">添加条件</string>
+    <string name="rule_edit_save">保存</string>
+    <string name="rule_edit_delete">删除规则</string>
+    <string name="rule_edit_no_condition">至少需要一个条件</string>
+    <string name="rule_edit_saved">已保存</string>
 </resources>
