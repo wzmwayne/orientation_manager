@@ -161,4 +161,5 @@
     <string name="cond_edit_pattern">更改字段内容（正则）</string>
     <string name="cond_edit_field">更改匹配字段</string>
     <string name="advanced_new_rule">新建规则</string>
+    <string name="action_delete">删除</string>
 </resources>

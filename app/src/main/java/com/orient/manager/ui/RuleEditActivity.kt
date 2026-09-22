@@ -30,6 +30,7 @@ class RuleEditActivity : AppCompatActivity() {
 
     private lateinit var store: AdvancedRuleStore
     private lateinit var adapter: ConditionsAdapter
+    private lateinit var toolbar: MaterialToolbar
     private lateinit var patternInput: EditText
     private lateinit var fieldSpinner: Spinner
     private lateinit var modeSpinner: Spinner
@@ -48,8 +49,18 @@ class RuleEditActivity : AppCompatActivity() {
         patternInput = findViewById(R.id.rule_pattern)
         fieldSpinner = findViewById(R.id.rule_field)
         modeSpinner = findViewById(R.id.rule_mode)
+        toolbar = findViewById(R.id.toolbar)
 
-        findViewById<MaterialToolbar>(R.id.toolbar).setNavigationOnClickListener { finish() }
+        toolbar.setNavigationOnClickListener { finish() }
+        toolbar.inflateMenu(R.menu.rule_edit)
+        toolbar.setOnMenuItemClickListener { item ->
+            if (item.itemId == R.id.action_delete_rule) {
+                delete()
+                true
+            } else {
+                false
+            }
+        }
 
         fieldSpinner.adapter = ArrayAdapter(
             this,
@@ -66,15 +77,15 @@ class RuleEditActivity : AppCompatActivity() {
         if (existing != null) {
             conditions.addAll(existing.conditions)
             modeSpinner.setSelection(modes.indexOf(existing.mode).coerceAtLeast(0))
-            title = getString(R.string.rule_edit_title) + " #" + (index + 1)
+            toolbar.title = getString(R.string.rule_edit_title) + " #" + (index + 1)
         } else {
             index = NEW_RULE
             modeSpinner.setSelection(modes.indexOf(OrientationMode.PORTRAIT).coerceAtLeast(0))
+            toolbar.title = getString(R.string.rule_edit_title)
         }
 
         findViewById<Button>(R.id.rule_add_condition).setOnClickListener { addCondition() }
         findViewById<Button>(R.id.rule_save).setOnClickListener { save() }
-        findViewById<Button>(R.id.rule_delete).setOnClickListener { delete() }
 
         adapter = ConditionsAdapter()
         findViewById<ListView>(R.id.rule_conditions).adapter = adapter
@@ -212,8 +223,7 @@ class RuleEditActivity : AppCompatActivity() {
 
     private fun render() {
         adapter.notifyDataSetChanged()
-        findViewById<Button>(R.id.rule_delete).visibility =
-            if (index == NEW_RULE) View.GONE else View.VISIBLE
+        toolbar.menu.findItem(R.id.action_delete_rule)?.isVisible = index != NEW_RULE
     }
 
     private inner class ConditionsAdapter : BaseAdapter() {
