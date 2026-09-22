@@ -18,6 +18,8 @@ class AppRuleStore(context: Context) {
         return OrientationMode.entries.firstOrNull { it.name == name }
     }
 
+    fun snapshot(): JSONObject = rules()
+
     fun set(pkg: String, mode: OrientationMode?) {
         val obj = rules()
         if (mode == null) obj.remove(pkg) else obj.put(pkg, mode.name)

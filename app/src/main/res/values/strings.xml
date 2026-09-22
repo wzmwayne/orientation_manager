@@ -90,6 +90,10 @@
     <string name="log_copied">已复制到剪贴板</string>
     <string name="log_empty">暂无日志</string>
     <string name="main_row_log">日志</string>
+    <string name="main_row_export">导出全部设置（JSON）</string>
+    <string name="export_running">正在导出…</string>
+    <string name="export_done">已导出全部设置（含按应用配置与高级规则）</string>
+    <string name="export_failed">导出失败，请重试</string>
     <string name="section_other">其他</string>
     <string name="perm_accessibility_desc_disconnected">已开启但未连接（可能被系统回收），点击重新开启</string>
     <string name="status_engine_offline">⚠ 无障碍未连接，强制逻辑未运行</string>

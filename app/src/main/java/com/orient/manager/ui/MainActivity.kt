@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
@@ -31,11 +32,15 @@ import com.orient.manager.core.PermissionsSnapshot
 import com.orient.manager.core.OrientationMode
 import com.orient.manager.core.OverlayForceController
 import com.orient.manager.core.RotationEnforcer
+import com.orient.manager.core.SettingsExporter
 import com.orient.manager.core.SystemFields
 import com.orient.manager.core.strategy.StrategyManager
 import com.orient.manager.pref.Prefs
 import com.orient.manager.service.OrientationAccessibilityService
 import com.orient.manager.service.RotationForegroundService
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -54,6 +59,10 @@ class MainActivity : AppCompatActivity() {
 
     private val chipModes = LinkedHashMap<Int, OrientationMode>()
     private var updating = false
+
+    private val exportLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri -> uri?.let { writeExport(it) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -128,6 +137,8 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.row_log).setOnClickListener {
             startActivity(Intent(this, LogActivity::class.java))
         }
+
+        findViewById<View>(R.id.row_export).setOnClickListener { startExport() }
 
         rowWrite.setOnClickListener {
             startActivity(
@@ -310,6 +321,43 @@ class MainActivity : AppCompatActivity() {
                     .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
             )
         }
+    }
+
+    private fun startExport() {
+        val name = "orient_settings_" +
+            SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".json"
+        try {
+            exportLauncher.launch(name)
+        } catch (t: Throwable) {
+            Logger.error("Export", "无法打开导出位置选择器", t)
+            Toast.makeText(this, getString(R.string.export_failed), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun writeExport(uri: Uri) {
+        Toast.makeText(this, getString(R.string.export_running), Toast.LENGTH_SHORT).show()
+        Logger.log("Export", "开始导出全部设置 -> " + uri)
+        Thread {
+            val failure = try {
+                val json = SettingsExporter.build(applicationContext)
+                contentResolver.openOutputStream(uri)?.use { stream ->
+                    stream.write(json.toByteArray())
+                } ?: throw IllegalStateException("openOutputStream 返回 null")
+                null
+            } catch (t: Throwable) {
+                t
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                if (failure == null) {
+                    Logger.log("Export", "已导出全部设置（按应用 + 高级规则 + 全局开关）")
+                    Toast.makeText(this, getString(R.string.export_done), Toast.LENGTH_LONG).show()
+                } else {
+                    Logger.error("Export", "导出设置失败", failure)
+                    Toast.makeText(this, getString(R.string.export_failed), Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     private fun applyMode(mode: OrientationMode) {

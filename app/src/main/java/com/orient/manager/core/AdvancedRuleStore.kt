@@ -157,7 +157,19 @@ class AdvancedRuleStore(context: Context) {
         null
     }
 
+    fun exportJson(): JSONArray = toJson(all())
+
     private fun save(list: List<AdvancedRule>) {
+        val array = toJson(list)
+        val raw = array.toString()
+        sp.edit().putString(KEY_RULES, raw).apply()
+        synchronized(lock) {
+            cache = list.toList()
+            cacheRaw = raw
+        }
+    }
+
+    private fun toJson(list: List<AdvancedRule>): JSONArray {
         val array = JSONArray()
         for (rule in list) {
             val obj = JSONObject()
@@ -173,12 +185,7 @@ class AdvancedRuleStore(context: Context) {
             obj.put("mode", rule.mode.name)
             array.put(obj)
         }
-        val raw = array.toString()
-        sp.edit().putString(KEY_RULES, raw).apply()
-        synchronized(lock) {
-            cache = list.toList()
-            cacheRaw = raw
-        }
+        return array
     }
 
     private fun ensureMigrated() {

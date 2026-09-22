@@ -82,6 +82,7 @@ adb shell pm grant com.orient.manager android.permission.WRITE_SECURE_SETTINGS
 | 计费 | 订阅 + 买断 + 外部 Key App | **无任何付费内容** |
 | 广告 | AdMob | 无（仅预留接口） |
 | 按应用规则 | Room 数据库 | SharedPreferences + JSON |
+| 设置导出 | 无 | 一键导出全部设置 JSON（全局开关 + 按应用配置 + 高级规则） |
 | 覆盖层级 | 仅强制旋转用 2032 | 强制旋转 / 检测窗 / 组件拾取全部 **2032 + SHOW_WHEN_LOCKED**（设置、锁屏等界面均可见） |
 | 日志 | 无 | 落盘 + 一键复制 |
 
@@ -97,6 +98,17 @@ adb shell pm grant com.orient.manager android.permission.WRITE_SECURE_SETTINGS
 #   android.aapt2FromMavenOverride=/usr/bin/aapt2（arm64 主机需要）
 ./gradlew :app:assembleDebug
 ~~~
+
+## 导出设置
+
+主界面「其他 → 导出全部设置（JSON）」会生成一份包含以下内容的 JSON（用系统文件选择器保存到任意位置）：
+
+\`\`\`
+{ "app": …, "versionName": …, "exportedAt": …,
+  "global":       { mode / 常驻通知 / 覆盖模式 / 检测悬浮窗 / 各通道开关 },
+  "perApp":       { enabled, rules: { 包名: 模式 } },
+  "advancedRules":{ enabled, rules: [ { mode, conditions: [ { field, pattern, negate } ] } ] } }
+\`\`\`
 
 ## 使用
 

@@ -19,6 +19,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.orient.manager.R
 import com.orient.manager.core.AppRuleStore
+import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationMode
 import java.text.Collator
 import java.util.Locale
@@ -96,16 +97,19 @@ class AppsActivity : AppCompatActivity() {
     }
 
     private fun applyFilter() {
-        shown.clear()
-        if (query.isEmpty()) {
-            shown.addAll(allEntries)
+        val matched = if (query.isEmpty()) {
+            allEntries
         } else {
             val q = query.lowercase(Locale.getDefault())
             allEntries.filter {
                 it.label.lowercase(Locale.getDefault()).contains(q) ||
                     it.pkg.lowercase(Locale.getDefault()).contains(q)
-            }.forEach { shown.add(it) }
+            }
         }
+        val (configured, others) = matched.partition { store.modeOf(it.pkg) != null }
+        shown.clear()
+        shown.addAll(configured)
+        shown.addAll(others)
         emptyView.visibility =
             if (allEntries.isNotEmpty() && shown.isEmpty()) View.VISIBLE else View.GONE
         adapter.notifyDataSetChanged()
@@ -120,7 +124,8 @@ class AppsActivity : AppCompatActivity() {
             .setTitle(entry.label)
             .setItems(labels) { _, which ->
                 store.set(entry.pkg, modes[which])
-                adapter.notifyDataSetChanged()
+                Logger.log("UI", "按应用配置：" + entry.pkg + " -> " + (modes[which]?.name ?: "默认"))
+                applyFilter()
             }
             .show()
     }
@@ -141,7 +146,7 @@ class AppsActivity : AppCompatActivity() {
             view.findViewById<TextView>(R.id.title).text = entry.label
             val rule = store.modeOf(entry.pkg)
             view.findViewById<TextView>(R.id.subtitle).text =
-                rule?.let { getString(it.labelRes) } ?: getString(R.string.rule_default)
+                rule?.let { "★ " + getString(it.labelRes) } ?: getString(R.string.rule_default)
             view.setOnClickListener { pick(entry) }
             return view
         }
