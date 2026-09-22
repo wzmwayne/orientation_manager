@@ -3,7 +3,7 @@ package com.orient.manager.service
 import android.app.Service
 import android.content.Intent
 import android.os.IBinder
-import androidx.core.app.NotificationManagerCompat
+import com.orient.manager.core.EngineState
 import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationController
 import com.orient.manager.notif.NotificationController
@@ -17,30 +17,29 @@ class RotationForegroundService : Service() {
         super.onCreate()
         Logger.log("Service", "onCreate")
         NotificationController.ensureChannel(this)
-        val mode = Prefs(this).mode
-        val notification = NotificationController.build(this, mode)
+        EngineState.initFromPrefs(this)
+        val mode = EngineState.mode
+        val source = EngineState.source
+        val notification = NotificationController.build(this, mode, source)
         try {
             startForeground(NotificationController.NOTIF_ID, notification)
-            Logger.log("Service", "startForeground 成功，常驻通知已显示")
+            Logger.log("Service", "startForeground 成功：" + mode.name + " · " + source)
         } catch (t: Throwable) {
             Logger.error("Service", "startForeground 失败，退化为普通常驻通知", t)
-            NotificationController.postPlain(this, mode)
+            NotificationController.postPlain(this, mode, source)
             stopSelf()
             return
         }
-        OrientationController.apply(this, mode)
+        OrientationController.apply(this, Prefs(this).mode, EngineState.source)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val mode = Prefs(this).mode
-        Logger.log("Service", "onStartCommand mode=" + mode.name)
-        OrientationController.apply(this, mode)
-        try {
-            NotificationManagerCompat.from(this)
-                .notify(NotificationController.NOTIF_ID, NotificationController.build(this, mode))
-        } catch (t: Throwable) {
-            Logger.error("Service", "更新通知失败", t)
-        }
+        EngineState.initFromPrefs(this)
+        Logger.log(
+            "Service",
+            "onStartCommand，当前生效 " + EngineState.mode.name + " · " + EngineState.source,
+        )
+        NotificationController.refreshCurrent(this)
         return START_STICKY
     }
 

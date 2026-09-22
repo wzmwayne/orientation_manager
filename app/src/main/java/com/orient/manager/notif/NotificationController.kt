@@ -9,8 +9,10 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.orient.manager.R
+import com.orient.manager.core.EngineState
 import com.orient.manager.core.Logger
 import com.orient.manager.core.OrientationMode
+import com.orient.manager.pref.Prefs
 import com.orient.manager.receiver.ActionReceiver
 import com.orient.manager.ui.MainActivity
 
@@ -34,10 +36,10 @@ object NotificationController {
         }
     }
 
-    fun build(context: Context, mode: OrientationMode) = NotificationCompat.Builder(context, CHANNEL_ID)
+    fun build(context: Context, mode: OrientationMode, source: String) = NotificationCompat.Builder(context, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_orientation)
         .setContentTitle(context.getString(R.string.app_name))
-        .setContentText(context.getString(mode.labelRes))
+        .setContentText(context.getString(mode.labelRes) + " · " + source)
         .setOngoing(true)
         .setShowWhen(false)
         .setContentIntent(
@@ -53,10 +55,30 @@ object NotificationController {
         .addAction(0, context.getString(R.string.mode_landscape), modeAction(context, OrientationMode.LANDSCAPE))
         .build()
 
-    fun postPlain(context: Context, mode: OrientationMode): Boolean = try {
+    fun refresh(context: Context, mode: OrientationMode, source: String) {
+        if (!Prefs(context).serviceEnabled) return
+        try {
+            ensureChannel(context)
+            NotificationManagerCompat.from(context).notify(NOTIF_ID, build(context, mode, source))
+            Logger.logThrottled(
+                "Notif",
+                "refresh",
+                "通知已更新为 " + mode.name + " · " + source,
+                600L,
+            )
+        } catch (t: Throwable) {
+            Logger.error("Notif", "刷新通知失败", t)
+        }
+    }
+
+    fun refreshCurrent(context: Context) {
+        EngineState.initFromPrefs(context)
+        refresh(context, EngineState.mode, EngineState.source)
+    }
+
+    fun postPlain(context: Context, mode: OrientationMode, source: String): Boolean = try {
         ensureChannel(context)
-        NotificationManagerCompat.from(context)
-            .notify(NOTIF_ID, build(context, mode))
+        NotificationManagerCompat.from(context).notify(NOTIF_ID, build(context, mode, source))
         Logger.log("Notif", "已投递普通常驻通知")
         true
     } catch (t: Throwable) {

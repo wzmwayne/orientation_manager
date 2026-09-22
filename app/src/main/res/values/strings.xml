@@ -105,4 +105,20 @@
     <string name="secure_copy">复制命令</string>
     <string name="secure_copied">命令已复制</string>
     <string name="secure_failed">未获得授权</string>
+    <string name="toast_service_started">方向管理已启动：%1$s</string>
+    <string name="toast_engine_stopped">方向管理已停止（%1$s）</string>
+    <string name="toast_rule_changed">%1$s → %2$s</string>
+    <string name="main_row_pages">按页面控制</string>
+    <string name="pages_title">按页面控制</string>
+    <string name="pages_enable">启用页面规则</string>
+    <string name="pages_enable_desc">优先级：页面 &gt; 单应用 &gt; 全局</string>
+    <string name="pages_hint">活动类名，如 androidx.compose.ui.window.d</string>
+    <string name="pages_add">添加</string>
+    <string name="pages_empty">暂无页面规则</string>
+    <string name="pages_help">匹配方式：类名包含即命中（忽略大小写），更长的规则优先。当前页面的类名可在日志里复制。</string>
+    <string name="pages_current">最近页面：%1$s</string>
+    <string name="pages_current_none">最近页面：暂无</string>
+    <string name="pages_delete">删除该规则</string>
+    <string name="pages_invalid">请输入活动类名</string>
+    <string name="pages_choose_mode">选择该页面的方向</string>
 </resources>

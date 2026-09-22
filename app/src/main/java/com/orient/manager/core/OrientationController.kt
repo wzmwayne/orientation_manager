@@ -6,6 +6,7 @@ import android.os.Build
 import android.provider.Settings
 import com.orient.manager.core.strategy.StrategyId
 import com.orient.manager.core.strategy.StrategyManager
+import com.orient.manager.notif.NotificationController
 
 object OrientationController {
 
@@ -16,14 +17,15 @@ object OrientationController {
         false
     }
 
-    fun apply(context: Context, mode: OrientationMode): Boolean {
+    fun apply(context: Context, mode: OrientationMode, source: String = "全局"): Boolean {
         val settings = StrategyManager.active(context, StrategyId.SETTINGS)
         val overlay = StrategyManager.active(context, StrategyId.OVERLAY)
         val shizuku = StrategyManager.active(context, StrategyId.SHIZUKU)
         val shell = StrategyManager.active(context, StrategyId.SHELL)
         Logger.log(
             "Apply",
-            "mode=" + mode.name + " settings=" + settings + " overlay=" + overlay +
+            "mode=" + mode.name + " source=" + source +
+                " settings=" + settings + " overlay=" + overlay +
                 " shizuku=" + shizuku + " shell=" + shell +
                 " override=" + com.orient.manager.pref.Prefs(context).overrideEnabled,
         )
@@ -32,6 +34,8 @@ object OrientationController {
             Logger.log("Apply", "模式=关闭：不写入任何系统设置，仅撤销强制窗口与监听")
             OverlayForceController.stop()
             RotationEnforcer.stop()
+            EngineState.update(mode, source)
+            NotificationController.refresh(context, mode, source)
             return true
         }
 
@@ -50,6 +54,9 @@ object OrientationController {
         } else {
             RotationEnforcer.stop()
         }
+
+        EngineState.update(mode, source)
+        NotificationController.refresh(context, mode, source)
         Logger.log(
             "Apply",
             "完成后 displayRotation=" + DisplayState.rotationName(DisplayState.rotation(context)) +

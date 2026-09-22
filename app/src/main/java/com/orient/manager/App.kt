@@ -3,6 +3,7 @@ package com.orient.manager
 import android.app.Application
 import android.os.Build
 import com.orient.manager.core.AccessibilityAutoStarter
+import com.orient.manager.core.EngineState
 import com.orient.manager.core.Logger
 import com.orient.manager.core.PermissionsSnapshot
 import com.orient.manager.service.OrientationAccessibilityService
@@ -12,6 +13,7 @@ class App : Application() {
     override fun onCreate() {
         super.onCreate()
         Logger.init(this)
+        EngineState.initFromPrefs(this)
         Logger.log(
             "App",
             "进程启动 sdk=" + Build.VERSION.SDK_INT + " device=" + Build.MANUFACTURER + " " + Build.MODEL,

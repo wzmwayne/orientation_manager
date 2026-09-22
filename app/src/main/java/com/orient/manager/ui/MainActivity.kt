@@ -123,6 +123,10 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, StrategiesActivity::class.java))
         }
 
+        findViewById<View>(R.id.row_pages).setOnClickListener {
+            startActivity(Intent(this, PageRulesActivity::class.java))
+        }
+
         findViewById<View>(R.id.row_log).setOnClickListener {
             startActivity(Intent(this, LogActivity::class.java))
         }
@@ -335,7 +339,7 @@ class MainActivity : AppCompatActivity() {
             Logger.warn("UI", "无障碍未连接，引擎不会运行，引导用户开启")
             runCatching { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         }
-        OrientationController.apply(this, mode)
+        OrientationController.apply(this, mode, "全局")
         Prefs(this).mode = mode
         Logger.log("UI", "选择方向: " + mode.name)
         if (mode.controlling && mode != OrientationMode.AUTO) {

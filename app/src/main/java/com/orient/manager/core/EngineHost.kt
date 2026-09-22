@@ -3,6 +3,7 @@ package com.orient.manager.core
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.orient.manager.R
 import com.orient.manager.pref.Prefs
 import com.orient.manager.service.RotationForegroundService
 
@@ -45,6 +46,10 @@ object EngineHost {
         context = null
         if (ctx != null) {
             stopNotification(ctx, reason)
+            ToastNotifier.show(
+                ctx,
+                ctx.getString(R.string.toast_engine_stopped, reason),
+            )
         }
         Logger.log(
             "Engine",
