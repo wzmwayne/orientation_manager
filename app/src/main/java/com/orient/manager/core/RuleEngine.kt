@@ -9,18 +9,20 @@ data class Resolution(val mode: OrientationMode, val source: String)
 
 object RuleEngine {
 
-    fun resolve(context: Context, pkg: String?, activityClass: String?): Resolution {
-        val page = PageRuleStore(context).match(activityClass)
-        if (page != null) {
-            val resolution = Resolution(page.mode, "页面 " + page.pattern)
+    fun resolve(context: Context, snapshot: WindowSnapshot): Resolution {
+        val ruleMatch = AdvancedRuleStore(context).match(snapshot, context.packageName)
+        if (ruleMatch != null) {
+            val source = "高级规则#" + (ruleMatch.index + 1) + " " + ruleMatch.rule.pattern
             Logger.log(
                 "Rule",
-                "解析：pkg=" + pkg + " 类名=" + activityClass +
-                    " → 命中页面规则[" + page.pattern + "]，模式=" + page.mode.name,
+                "解析：包=" + snapshot.pkg + " 活动=" + snapshot.activityClass +
+                    " → 命中 " + source + "（字段=" + ruleMatch.rule.field.name +
+                    "，值=" + ruleMatch.matchedValue + "），模式=" + ruleMatch.rule.mode.name,
             )
-            return resolution
+            return Resolution(ruleMatch.rule.mode, source)
         }
         val global = Prefs(context).mode
+        val pkg = snapshot.pkg
         if (pkg.isNullOrBlank()) {
             Logger.log("Rule", "解析：无包名 → 全局模式 " + global.name)
             return Resolution(global, "全局")
@@ -40,12 +42,12 @@ object RuleEngine {
         }
     }
 
-    fun applyForForeground(context: Context, pkg: String?, activityClass: String?): Resolution? {
+    fun applyForForeground(context: Context, snapshot: WindowSnapshot): Resolution? {
         if (!StrategyManager.active(context, StrategyId.ACCESSIBILITY)) {
             Logger.logThrottled("Rule", "skip", "无障碍方案已关闭，跳过规则应用", 5000L)
             return null
         }
-        val resolution = resolve(context, pkg, activityClass)
+        val resolution = resolve(context, snapshot)
         OrientationController.apply(context, resolution.mode, resolution.source)
         return resolution
     }

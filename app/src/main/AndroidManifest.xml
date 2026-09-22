@@ -44,9 +44,9 @@
         </activity>
 
         <activity
-            android:name=".ui.PageRulesActivity"
+            android:name=".ui.AdvancedRulesActivity"
             android:exported="false"
-            android:label="@string/pages_title" />
+            android:label="@string/advanced_title" />
 
         <activity
             android:name=".ui.LogActivity"

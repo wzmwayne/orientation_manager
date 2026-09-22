@@ -108,8 +108,8 @@
     <string name="toast_service_started">方向管理已启动：%1$s</string>
     <string name="toast_engine_stopped">方向管理已停止（%1$s）</string>
     <string name="toast_rule_changed">%1$s → %2$s</string>
-    <string name="main_row_pages">按页面控制</string>
-    <string name="pages_title">按页面控制</string>
+    <string name="main_row_pages">高级规则</string>
+    <string name="pages_title">高级规则</string>
     <string name="pages_enable">启用页面规则</string>
     <string name="pages_enable_desc">优先级：页面 &gt; 单应用 &gt; 全局</string>
     <string name="pages_hint">活动类名，如 androidx.compose.ui.window.d</string>
@@ -124,4 +124,21 @@
     <string name="pages_detect">立即检测</string>
     <string name="pages_inspector">悬浮窗界面活动检测</string>
     <string name="pages_inspector_desc">显示可拖动的悬浮窗：当前活动 + 最近 4 次不同活动</string>
+    <string name="advanced_title">高级规则</string>
+    <string name="advanced_help">支持正则（部分匹配，可用 ^ $ 锚定）；按所选字段筛选；列表顺序即优先级，自上而下第一个命中者生效</string>
+    <string name="advanced_hint">正则表达式，如 .*Settings.*</string>
+    <string name="advanced_empty">暂无高级规则</string>
+    <string name="advanced_field_prompt">选择筛选字段</string>
+    <string name="advanced_change_field">更改筛选字段</string>
+    <string name="advanced_delete">删除该规则</string>
+    <string name="advanced_invalid">正则表达式无效</string>
+    <string name="advanced_need_pattern">请输入匹配内容</string>
+    <string name="advanced_added">已添加规则</string>
+    <string name="advanced_enable">启用高级规则</string>
+    <string name="advanced_enable_desc">优先级：高级规则 &gt; 单应用 &gt; 全局</string>
+    <string name="rule_field_any">全部字段</string>
+    <string name="rule_field_package">包名</string>
+    <string name="rule_field_activity">活动类名</string>
+    <string name="rule_field_window_title">窗口标题</string>
+    <string name="rule_field_window_class">窗口类名</string>
 </resources>

@@ -3,7 +3,7 @@ package com.orient.manager.core
 import android.content.Context
 import org.json.JSONObject
 
-data class PageMatch(val pattern: String, val mode: OrientationMode)
+data class PageMatch(val pattern: String, val matchedValue: String, val mode: OrientationMode)
 
 class PageRuleStore(context: Context) {
 
@@ -31,42 +31,46 @@ class PageRuleStore(context: Context) {
         sp.edit().putString(KEY_RULES, obj.toString()).apply()
     }
 
-    fun match(activityClass: String?): PageMatch? {
+    fun match(snapshot: WindowSnapshot, ownerPackage: String): PageMatch? {
         val rules = all()
         if (!enabled) {
             Logger.logThrottled(
                 "PageRule",
                 "disabled",
-                "页面规则已关闭，跳过匹配（类名=" + activityClass + "，规则数=" + rules.size + "）",
+                "页面规则已关闭，跳过匹配（规则数=" + rules.size + "）",
                 5000L,
             )
             return null
         }
-        if (activityClass.isNullOrBlank()) {
-            Logger.logThrottled(
-                "PageRule",
-                "noClass",
-                "未取到活动类名，无法匹配页面规则（规则数=" + rules.size + "）",
-                3000L,
-            )
+        val candidates = snapshot.candidateValues(ownerPackage)
+        if (candidates.isEmpty()) {
+            Logger.logThrottled("PageRule", "noCandidates", "无可匹配候选值，跳过页面规则", 3000L)
             return null
         }
-        val lower = activityClass.lowercase()
         var best: PageMatch? = null
         for ((pattern, mode) in rules) {
             if (pattern.isBlank()) continue
-            if (!lower.contains(pattern.lowercase())) continue
+            val lower = pattern.lowercase()
+            val hit = candidates.firstOrNull { it.lowercase().contains(lower) } ?: continue
             val current = best
             if (current == null || pattern.length > current.pattern.length) {
-                best = PageMatch(pattern, mode)
+                best = PageMatch(pattern, hit, mode)
             }
         }
-        Logger.log(
-            "PageRule",
-            "页面匹配：类名=" + activityClass + "，规则数=" + rules.size +
-                "，命中=" + (best?.pattern ?: "无") +
-                (best?.let { " → " + it.mode.name } ?: ""),
-        )
+        if (best != null) {
+            Logger.log(
+                "PageRule",
+                "页面匹配：候选 " + candidates.size + " 个，规则 " + rules.size +
+                    " 条，命中=" + best.pattern + "（匹配到 " + best.matchedValue + "）→ " + best.mode.name,
+            )
+        } else {
+            Logger.logThrottled(
+                "PageRule",
+                "noHit",
+                "页面匹配：候选 " + candidates.size + " 个，规则 " + rules.size + " 条，未命中",
+                2000L,
+            )
+        }
         return best
     }
 

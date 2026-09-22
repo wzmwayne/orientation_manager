@@ -124,7 +124,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.row_pages).setOnClickListener {
-            startActivity(Intent(this, PageRulesActivity::class.java))
+            startActivity(Intent(this, AdvancedRulesActivity::class.java))
         }
 
         findViewById<View>(R.id.row_log).setOnClickListener {
